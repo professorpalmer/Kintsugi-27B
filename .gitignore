@@ -1,0 +1,5 @@
+models/*.gguf
+slots/
+logs/
+bin/
+__pycache__/

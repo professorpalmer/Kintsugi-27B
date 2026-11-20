@@ -1,0 +1,37 @@
+Kintsugi-27B v1 for Windows - notices
+
+Our files in this bundle (start-server.ps1, stop.ps1, the layer in layer\, README.md, CREDITS.md and the other text
+files) are licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The model file is not in this bundle. Kintsugi-27B-12G.gguf is distributed on its own model page with its own licence
+and notices. It is built from Qwen3.8-27B (Qwen, Apache-2.0); every tensor that is not a coded projection comes from
+Qwen's BF16 release, and the coded projections are our fits.
+
+Third-party software in this bundle:
+
+1. The engine in bin\ (llama-server.exe, llama-perplexity.exe, test-backend-ops.exe and the ggml / llama / mtmd DLLs)
+   is a fork of llama.cpp / ggml (ggml-org and contributors), MIT License:
+   Copyright (c) 2023-2026 The ggml authors. Full text: licenses\LICENSE-llama.cpp.
+   It includes:
+   - the EXL3 trellis kernels from exllamav3 (turboderp), MIT License, Copyright (c) 2025 Turboderp.
+     Full text: licenses\LICENSE-exllamav3.
+   - cpp-httplib (Yuji Hirose, MIT), nlohmann/json (Niels Lohmann, MIT), and the hash and other vendored components of
+     llama.cpp under their own licences: licenses\vendor\.
+   The fork's changes (the Escha / EXL3 trellis op, the tiered K/V cache, the two-stage output head, background saves
+   and the other serving changes) are under the same MIT License. The Escha op for ggml comes from Ajay9o9's
+   llama.cpp-escha (MIT).
+
+2. NVIDIA CUDA runtime DLLs in bin\ (cudart64_13.dll, cublas64_13.dll, cublasLt64_13.dll, nvJitLink_130_0.dll,
+   nvvm64_40_0.dll) are NVIDIA's binaries, redistributed unmodified under the NVIDIA CUDA Toolkit End User License
+   Agreement (https://docs.nvidia.com/cuda/eula/). They are not covered by our licences and are not open source.
+
+3. The layer (layer\) comes from our own Bonsai / Mirai serving layer. Its sandbox tools (off in this build) would use
+   the Python package wasmtime (Bytecode Alliance, Apache-2.0 WITH LLVM-exception); it is not in this bundle and not
+   needed.
+
+Data and tools used to make the model (not in this bundle): the public Hessians, golden BF16 set and KL scorer of the
+Qwen3.8-27B quant challenge (StillDeadcode, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/); we used the
+Hessians to fit the coded projections and the golden set and scorer to measure them. exllamav3's quantize_exl3 (MIT)
+made the fits. escha-mlx (Escha Labs, Apache-2.0) reference functions computed the codec tables.
+
+Full credits: CREDITS.md. No person or company named here endorses or sponsors this project.
