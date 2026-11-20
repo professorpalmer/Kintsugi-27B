@@ -43,7 +43,7 @@ $Kv = Pick 'KV' 'q4_0'
 $Think = Pick 'THINK' 'medium'
 if (-not (Test-Path $Model)) {
     Write-Host "Kintsugi-27B: model file not found: $Model"
-    Write-Host "  Download Kintsugi-27B-12G.gguf from https://huggingface.co/CaryPalmer/Kintsugi-27B (the test-access repo)"
+    Write-Host "  Download Kintsugi-27B-12G.gguf from https://huggingface.co/CaryPalmer/Kintsugi-27B"
     Write-Host "  and put it in $(Join-Path $Root 'models'). SHA-256 0510bae82445dc53dbc7d0d842d8b7e146b8eafce0837e39b157d411e48c8a74"
     Write-Host "  (check it with: Get-FileHash models\Kintsugi-27B-12G.gguf). Or set KINTSUGI_MODEL to the file's path."
     exit 1
