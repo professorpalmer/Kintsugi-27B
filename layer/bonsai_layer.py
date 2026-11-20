@@ -846,7 +846,44 @@ class Proxy(http.server.BaseHTTPRequestHandler):
             s = self.slots
             return self._reply(200, "application/json", json.dumps(
                 {"on": s is not None, "after": bool(s and s.after_on), "busy": bool(s and s.busy)}).encode())
-        self._reply(*self._forward("GET"))
+        self._get_passthrough()
+
+    def _get_passthrough(self):
+        """A plain GET (the server's browser page and its files, /props, /health, /v1/models): forwarded with the headers a
+        browser needs. The server sends its page gzip-only and answers 415 without "Accept-Encoding: gzip", so that header
+        goes up and Content-Encoding (with the cache headers) comes back as is. No GET body is parsed here."""
+        keep_up = ("authorization", "accept-encoding", "if-none-match", "if-modified-since", "accept", "last-event-id")
+        headers = {k: v for k, v in self.headers.items() if k.lower() in keep_up}
+        req = urllib.request.Request(self.upstream + self.path, method="GET", headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=7200) as r:
+                if "text/event-stream" in (r.headers.get("Content-Type") or ""):
+                    # an SSE stream (the UI's resumed stream, /v1/stream): relay each chunk as it arrives
+                    self.send_response(r.status)
+                    self.send_header("Content-Type", r.headers.get("Content-Type"))
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.close_connection = True
+                    while True:
+                        chunk = r.read1(65536)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                    return
+                status, rh, data = r.status, r.headers, r.read()
+        except urllib.error.HTTPError as e:
+            status, rh, data = e.code, e.headers, e.read()
+        self.send_response(status)
+        for k in ("Content-Type", "Content-Encoding", "Cache-Control", "ETag", "Last-Modified", "Vary"):
+            v = rh.get(k)
+            if v:
+                self.send_header(k, v)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(data)
 
     def _with_slots(self, body, fn, info=None):
         """Run fn (which sends body to the server) as a request that takes part in the saved-conversation cache: it passed
