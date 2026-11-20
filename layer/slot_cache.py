@@ -138,6 +138,7 @@ class SlotCache:
         self.wait = None               # the same, armed by before(): the next reply's cached count resolves it
         self.busy_n = 0                # chat requests between their start and the end of after(): a stop now can lose a save
         self.busy_lock = threading.Lock()
+        self.bg_n = 0                  # background saves in flight (a stop now loses them): the 'saving' field; stop.ps1 waits
         os.makedirs(self.folder, exist_ok=True)
         self.conv_path = os.path.join(self.folder, PREFIX + "conv.json")
         self.conv = {}                 # conversation key -> True / False: the last prefix test passed / failed
@@ -286,6 +287,12 @@ class SlotCache:
     @property
     def busy(self):
         return self.busy_n > 0
+
+    @property
+    def saving(self):
+        """A background save after the answer is still being written (bg_n): a stop now loses it. Kept apart from busy,
+        whose readers (idle_tick, the busy field of /layer/slot-cache) keep their meaning."""
+        return self.bg_n > 0
 
     def _conv_key(self, toks):
         """A conversation is its first BONSAI_SLOT_CACHE_MIN tokens (they do not change from turn to turn). Two
@@ -500,7 +507,15 @@ class SlotCache:
             self.log("background saves", "on" if (self.async_ok and self.async_on) else "off (server or BONSAI_SLOT_SAVE_ASYNC=0)")
         return self.async_ok and self.async_on
 
-    def _finish_async(self, tmp, parent, toks, key, old_chain, auth, t1, held_ref=None):
+    def _finish_async(self, *args, **kw):
+        """_finish_async_body, counted in bg_n (saving) until it ends, so a stop script can wait for the save."""
+        try:
+            return self._finish_async_body(*args, **kw)
+        finally:
+            with self.busy_lock:
+                self.bg_n = max(0, self.bg_n - 1)
+
+    def _finish_async_body(self, tmp, parent, toks, key, old_chain, auth, t1, held_ref=None):
         """A background save after the answer: wait (without the lock) until the server has written the file, then index
         it under the lock, as the synchronous path does. A failed or lost write leaves no index entry."""
         state, st = "pending", {}
@@ -777,6 +792,8 @@ class SlotCache:
                 r = self._post("/slots/0?action=save", body, auth)
                 if bg and r.get("pending"):
                     # the server copied the state and answers now; a thread indexes the save when the file is written
+                    with self.busy_lock:   # 'saving' until the thread has indexed the file (or given up)
+                        self.bg_n += 1
                     threading.Thread(target=self._finish_async,
                                      args=(tmp, parent, list(toks), last["key"], old_chain, auth, t1, self.held), daemon=True).start()
                     info.update(pending=True, delta_of=self.index[parent]["n"] if parent else None,

@@ -1,4 +1,4 @@
-# Kintsugi-27B v1 (Windows, RTX 20 / 30 / 40, 12 GB)
+# Kintsugi-27B v1.0.1 (Windows, RTX 20 / 30 / 40, 12 GB)
 
 ![Kintsugi-27B](kintsugi-card.png)
 
@@ -106,6 +106,11 @@ How the answers felt (long-document answers, chat after a restart, code, tools):
   shorter answer.
 - One chat at a time (one slot). The server listens on 127.0.0.1 only.
 - RTX 50 series (Blackwell) is not built in this release, by choice.
+
+## Changes
+
+- v1.0.1: the layer streams /v1/messages and /v1/responses live (Claude Code, Codex); API-key headers forwarded;
+  stop.ps1 waits for an in-flight chat save.
 
 Model updates ship as a new .gguf file; the bundle stays the same.
 

@@ -20,6 +20,7 @@ calls one of the client's own tools. The client sees one ordinary response.
 Everything else (other paths, auth header) is forwarded verbatim.
 """
 import argparse
+import contextlib
 import hmac
 import http.server
 import json
@@ -416,6 +417,51 @@ class Proxy(http.server.BaseHTTPRequestHandler):
                 self._note_cache(out[2])
                 return out
         return self._forward_raw(method, body)
+
+    # Headers that a POST other than chat/completions sends up (harness gate 2026-11-20): the API key in either form
+    # (Authorization, x-api-key), the body type, Accept, and the API version / feature headers of the Anthropic and
+    # OpenAI clients (anthropic-version, anthropic-beta, openai-beta, ...). Nothing else (no Host, no cookies).
+    _NONCHAT_UP = ("authorization", "content-type", "accept", "x-api-key")
+
+    def _nonchat_headers(self):
+        return {k: v for k, v in self.headers.items()
+                if k.lower() in self._NONCHAT_UP or k.lower().startswith(("anthropic-", "openai-"))}
+
+    def _forward_nonchat(self, raw):
+        """A POST other than /v1/chat/completions (/v1/messages, /v1/responses, /completion, /tokenize, ...): sent up
+        with _nonchat_headers and relayed as the server sends it. A stream (text/event-stream) goes out chunk by chunk
+        as it arrives, so the client sees each event when it is made, with the server's own keep-alive bytes; no
+        comments are added here. Any other answer goes out whole. The request runs under the saved-conversation lock,
+        so a save or restore can not run while the server works on it (one server slot). These paths get no saves of
+        their own (docs/HARNESS-GATE.md: saves for /v1/messages and /v1/responses are later than v1.1)."""
+        lock = self.slots.lock if self.slots is not None else contextlib.nullcontext()
+        with lock:
+            req = urllib.request.Request(self.upstream + self.path, data=raw, method="POST", headers=self._nonchat_headers())
+            try:
+                r = urllib.request.urlopen(req, timeout=7200)
+            except urllib.error.HTTPError as e:
+                return self._reply(e.code, e.headers.get("Content-Type", "application/json"), e.read())
+            ctype = r.headers.get("Content-Type", "application/json")
+            if "event-stream" not in ctype:
+                with r:
+                    return self._reply(r.status, ctype, r.read())
+            self.send_response(r.status)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.close_connection = True
+            try:
+                while True:
+                    chunk = r.read1(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            finally:
+                r.close()
 
     def _forward_raw(self, method, body=None):
         headers = {k: v for k, v in self.headers.items() if k.lower() in ("authorization", "content-type")}
@@ -845,7 +891,8 @@ class Proxy(http.server.BaseHTTPRequestHandler):
         if self.path.rstrip("/") == "/layer/slot-cache":   # for stop scripts and harnesses: wait while busy before a stop
             s = self.slots
             return self._reply(200, "application/json", json.dumps(
-                {"on": s is not None, "after": bool(s and s.after_on), "busy": bool(s and s.busy)}).encode())
+                {"on": s is not None, "after": bool(s and s.after_on), "busy": bool(s and s.busy),
+                 "saving": bool(s and getattr(s, "saving", False))}).encode())
         self._get_passthrough()
 
     def _get_passthrough(self):
@@ -934,7 +981,7 @@ class Proxy(http.server.BaseHTTPRequestHandler):
             except Exception:   # noqa: BLE001  (not JSON: the server answers it)
                 pass
         if not self.path.rstrip("/").endswith("/chat/completions"):
-            return self._reply(*self._forward("POST", raw))
+            return self._forward_nonchat(raw)
         try:
             body = json.loads(raw)
         except json.JSONDecodeError:
