@@ -26,6 +26,9 @@
 #   KINTSUGI_SLOT_CACHE_GB   size limit of that folder in GB (default 20; the oldest files are removed past it)
 #   KINTSUGI_UB            micro-batch for prompt reads (default 1024; 512 saves about 146 MiB and reads 8-13 % slower)
 #   KINTSUGI_EXTRA         more llama-server arguments
+#   KINTSUGI_CHAT_TEMPLATE chat template file (default templates\kintsugi.jinja: the model's template, except that a
+#                          system message after the first turn, as Claude Code sends, is accepted); "model" = the
+#                          template inside the model file; any other value = the path of your own template
 param([int]$Port = 8080, [switch]$Wait, [switch]$DryRun)
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -150,11 +153,15 @@ if ($UseLayer) {
     if (-not $DryRun) { $SlotDir = (New-Item -ItemType Directory -Force -Path $SlotDir).FullName }
 }
 $Ub = [int](Pick 'UB' 1024)
+# Chat template: the bundle's (default), the model file's own ("model"), or a file of the user's.
+$Template = Pick 'CHAT_TEMPLATE' (Join-Path $Root 'templates\kintsugi.jinja')
+if ($Template -ne 'model' -and -not (Test-Path $Template)) { throw "chat template not found: $Template (set KINTSUGI_CHAT_TEMPLATE)" }
 $SrvArgs = @('-m', ('"' + $Model + '"'), '-ngl', '99', '-c', "$Ctx", '-fa', 'on', '-np', '1', '-ub', "$Ub", '--fit', 'off', '--jinja',
           '-ctk', $Kv, '-ctv', $Kv, '--kv-vram-cells', "$Cells", '--kq-mask-packed', '--cache-ram', '4096', '--backend-sampling',
           '--reasoning-budget', '20480', '-n', '24576', '--reasoning-budget-message', '"Now produce the complete answer."',
           '--reasoning-effort-allow', 'medium', '--reasoning-effort-fallback', 'medium', '--reasoning-max-tokens-floor', '24576',
           '--host', $(if ($UseLayer) { '127.0.0.1' } else { $ListenHost }), '--port', "$ServerPort") + $Spec
+if ($Template -ne 'model') { $SrvArgs += @('--chat-template-file', ('"' + $Template + '"')) }
 if ($KeyFile) { $SrvArgs += @('--api-key-file', ('"' + $KeyFile + '"')) }
 if ($SlotDir) { $SrvArgs += @('--slot-save-path', ('"' + $SlotDir + '"')) }
 $Extra = Pick 'EXTRA' ''
@@ -164,6 +171,7 @@ Write-Host "Kintsugi-27B"
 Write-Host "model  $(Split-Path $Model -Leaf)"
 Write-Host "listen $ListenHost`:$Port$(if ($UseLayer) { " (layer; llama-server on 127.0.0.1:$ServerPort)" })$(if ($KeyFile) { ", API key on" })"
 Write-Host "kv     $Kv, tiered: cells 0..$Cells in VRAM, $Cells..$Ctx in system RAM (free $($TotalMiB - $UsedMiB) MiB, ceiling $Ceiling, fixed $Fixed, growth $Growth, margin $Margin$(if ($Headless) { ', no display on this card' }))"
+Write-Host "template $(if ($Template -eq 'model') { 'the model file''s own' } else { $Template })"
 if ($Head2 -gt 0) { Write-Host "head   two-stage: first stage q4_0 in VRAM, $Head2 exact candidates for each row from system RAM" }
 Write-Host "spec   $(if ($Draft -le 0) { 'off' } else { "MTP draft $Draft + lookup" }); thinking $Think; read $($env:GGML_ESCHA_PREFILL)"
 if ($DryRun) { Write-Host ("args   " + ($SrvArgs -join ' ')); exit 0 }
