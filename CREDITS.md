@@ -13,9 +13,9 @@ Kintsugi-27B stands on a lot of other people's work. If we missed you, tell us a
 - **Escha Labs (Zihao Tu, Yangzihao Wang, Jiaming Pan and the escha-mlx authors)**: the Escha W2 format (EXL3 code with
   Hadamard input / output scales) and the `escha-mlx` reference, which our converter uses to compute the codec tables
   and our tests use as ground truth (Apache-2.0). Escha W2 was where this project started.
-- **YourHighnessLA (L0xRE)**: the L0xRE / Escha W2 release, whose format work and original bit layout (the bit
-  allocation of L0xRE-V2) were the starting point of ours, and the L0xRE runtime, whose int8 prefill design we
-  re-implemented as our fast read.
+- **YourHighnessLA (L0xRE)**: the **bit allocation of L0xRE-V2, which Kintsugi-27B uses unchanged** (the choice of 2
+  or 3 bits for each projection); the L0xRE / Escha W2 release and its format work, where this project started; and
+  the L0xRE runtime, whose int8 prefill design we re-implemented as our fast read.
 - **StillDeadcode (Qwen3.8-27B quant challenge)**: the public Hessians we fitted with, and the golden BF16 set and KL
   scorer we measured with (CC BY 4.0). The Hessians come from openly licensed corpora; credit to their publishers
   (Hugging Face FineWeb-Edu, EPFL FineWeb2-HQ, Wikimedia, Common Pile, BigCode The Stack, NVIDIA When2Call and the other

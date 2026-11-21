@@ -48,8 +48,11 @@ default. If you run the file another way, use that template.
 
 ## How it was made
 
-- **Bit layout:** the choice of 2 or 3 bits for each of the 400 projections started from the L0xRE-V2 bit layout by
-  YourHighnessLA (L0xRE).
+- **Bit layout:** the L0xRE-V2 bit allocation by YourHighnessLA (L0xRE), used unchanged: 2 or 3 bits for each of the
+  400 projections. We built our own maps with lower KL. They failed the recall, long-answer or agent gates, so the
+  release keeps this layout: see [research/bit-allocation/](../research/bit-allocation/README.md).
+- **Head:** Q8_0 with one scale for each 32 weights, read in two stages by the engine (see
+  [engine/](../engine/README.md)).
 - **Fits:** our own, made with exllamav3's `quantize_exl3` (turboderp) on Qwen's BF16 weights, with the public
   Hessians of the Qwen3.8-27B quant challenge (StillDeadcode, CC BY 4.0).
 - **Codec tables:** computed with the reference functions of escha-mlx (Escha Labs, Apache-2.0).

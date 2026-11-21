@@ -3,12 +3,17 @@
 Kintsugi-27B is Qwen3.8-27B at 2.47 bits per weight, made to run on one 12 GB NVIDIA card with the full
 262,144-token context. It comes as a model file and a Windows bundle (engine, launcher, saved-chat layer).
 
+Built on: the **L0xRE-V2 bit allocation** by YourHighnessLA (used unchanged), the **Escha W2 format** by Escha Labs,
+and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: [CREDITS.md](CREDITS.md).
+
 **What is special**
 
 - **2.47 bits per weight**: 27 billion weights in a 10.5 GB file (EXL3 trellis code).
 - **The full 262,144-token context on 12 GB**: the tiered K/V cache keeps about the first 144k tokens in
   VRAM and the rest in system RAM.
 - **Saved chats**: a saved 245k-token chat restores in 2.5 s, so a long chat continues after a restart.
+- **Gated on tasks, not only on KL**: every candidate bit map had to pass long-context recall, long-answer and agent
+  tests. Our maps with lower KL failed them and did not ship ([the study](research/bit-allocation/README.md)).
 - **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
 - **Runs on RTX 20, 30 and 40 cards** with 12 GB or more.
 - **Fully open**: Apache-2.0 for the model and our files, MIT for the engine. The engine source is in every release.
