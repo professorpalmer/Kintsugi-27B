@@ -22,7 +22,7 @@ The source of each release build is a release asset. Licence: MIT, the same as l
 
 | Engine | Bundles | Source asset | sha256 |
 |---|---|---|---|
-| `5f393adb5` | v1.1 (Windows and Linux) | `Kintsugi-27B-v1.1-engine-src-5f393adb5.tar.gz` (37,360,262 bytes) | `ded8fd4ee8c67c1088b173bd49a21ab201a1407d1ee64b2bcd01f9d3ebcaf4a6` |
+| `5f393adb5` | v1.1 (Windows and Linux), v1.1.1 (Linux) | `Kintsugi-27B-v1.1-engine-src-5f393adb5.tar.gz` (37,360,262 bytes) | `ded8fd4ee8c67c1088b173bd49a21ab201a1407d1ee64b2bcd01f9d3ebcaf4a6` |
 | `af70fc544` | v1.0.4 (Linux) | `Kintsugi-27B-v1.0.4-engine-src-af70fc544.tar.gz` (37,359,975 bytes) | `553c2222a156f5734be39206b19cb0bbd084d881bc473c9298d340ad807edd00` |
 | `c07efbec5` | v1 to v1.0.3 (Windows) | `Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz` (37,358,085 bytes) | `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7` |
 
@@ -40,7 +40,8 @@ cmake --build build --target llama-server llama-perplexity test-backend-ops
 ```
 
 - **Linux:** also give `-DLLAMA_USE_PREBUILT_UI=OFF`. Without it, the `llama-ui-assets` step tries to download the
-  prebuilt web UI and the build stops there.
+  prebuilt web UI and the build stops there. Also give `-DGGML_CUDA_NCCL=OFF` (from v1.1.1): with NCCL on, the engine
+  needs `libnccl.so.2` at run time, which a machine with only the NVIDIA driver does not have.
 - **One GPU family only:** set `CMAKE_CUDA_ARCHITECTURES` to it, for example `75-real` (RTX 20), `86-real` (RTX 30)
   or `89-real` (RTX 40).
 - **CUDA toolkit:** 12.2 or newer. The Windows bundle uses CUDA 13.

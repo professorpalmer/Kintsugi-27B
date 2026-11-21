@@ -5,6 +5,19 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.1.1 (2026-11-21, Linux only)
+
+- **Linux: the engine no longer needs NCCL (libnccl.so.2).** The v1.0.4 and v1.1 Linux engines did not start on a
+  machine with only the NVIDIA driver installed (the start stopped with "error while loading shared libraries:
+  libnccl.so.2: cannot open shared object file"). The engine is now built without NCCL, and `bin/` also carries the
+  OpenMP runtime (`libgomp.so.1`). No other libraries are necessary.
+- The model file, the engine source (`5f393adb5`) and the numerics do not change.
+- The README in the tarball names the v1.1.1 tarball in its quick start (the v1.1 tarball still said v1.0.4 there).
+- Tested on a machine with only the NVIDIA driver (Ubuntu 22.04.5, driver 575.51.03, RTX 4060 Ti 16 GB): it starts and
+  passes the release smokes; the output is token-identical to v1.1 on the same machine (50 / 50 prompts).
+- Windows: no change. The v1.1.1 release also carries the unchanged v1.1 Windows zip and engine source.
+- Linux: `Kintsugi-27B-v1.1.1-linux-x86_64.tar.gz`, sha256 `0d55dd1bc0e943276208ea8343e95d93a42b3f5a025c11c7000c9d95e092d701`.
+
 ## v1.1 (2026-11-21)
 
 - **Faster decode with an optional drafter.** Download `dflash-Qwen3.8-27B-Q4_0.gguf` (1.1 GB) from [Hugging

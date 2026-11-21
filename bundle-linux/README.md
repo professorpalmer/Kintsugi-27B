@@ -1,4 +1,4 @@
-# Kintsugi-27B v1.1 for Linux (x86_64, RTX 20 / 30 / 40, 12 GB)
+# Kintsugi-27B v1.1.1 for Linux (x86_64, RTX 20 / 30 / 40, 12 GB)
 
 These are the text files of the Linux tarball; download the tarball from
 [Releases](https://github.com/professorpalmer/Kintsugi-27B/releases/latest). The tarball also holds the engine
@@ -18,14 +18,16 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
 - Linux x86_64 with glibc 2.34 or newer and the libstdc++ of GCC 12 or newer (the engine needs GLIBC_2.34 and
   GLIBCXX_3.4.30). Ubuntu 22.04 and 24.04 have both.
 - `curl` and `nvidia-smi` (it comes with the driver). 32 GB of system RAM or more is best for very long chats.
+- No other libraries are necessary: the bundle carries the CUDA runtime, cuBLAS and the OpenMP runtime (libgomp) in
+  `bin/`. From v1.1.1 the engine does not need NCCL (libnccl.so.2); v1.0.4 and v1.1 did not start without it.
 - Optional: Python 3.10 or newer, for saved chats. No extra Python packages are needed.
 
 ## Download and start
 
-1. Download `Kintsugi-27B-v1.0.4-linux-x86_64.tar.gz` from the Releases page and unpack it:
+1. Download `Kintsugi-27B-v1.1.1-linux-x86_64.tar.gz` from the Releases page and unpack it:
 
    ```
-   tar -xzf Kintsugi-27B-v1.0.4-linux-x86_64.tar.gz
+   tar -xzf Kintsugi-27B-v1.1.1-linux-x86_64.tar.gz
    cd Kintsugi-27B
    ```
 
@@ -84,6 +86,8 @@ then also set `KINTSUGI_KEY_FILE` to a file holding an API key. Logs are in `log
 - On RTX 20 (Turing) cards, drafting (MTP or DFlash2) is not bit-identical to one-token decoding: near ties can round
   the other way in the verify path. The fidelity is the same (our Turing KL check). On RTX 30 / 40 it is bit-identical.
 - Tested with an RTX 4070 on Ubuntu 22.04 (drivers 580.178 and 595.91) and 24.04 (driver 615.71). The fallback for
-  570 drivers was tested on an RTX 2080 Ti (driver 570.133). Built on Ubuntu 22.04 with GCC 11.
+  570 drivers was tested on an RTX 2080 Ti (driver 570.133). v1.1.1 was also started on a machine with only the NVIDIA
+  driver installed (Ubuntu 22.04.5, driver 575.51.03, RTX 4060 Ti 16 GB, no CUDA toolkit, no NCCL: it starts and passes the release
+  smokes; the output is token-identical to v1.1 on the same machine, 50 / 50 prompts). Built on Ubuntu 22.04 with GCC 11, without NCCL.
 
 Licences and credits: [LICENSE](../LICENSE), [NOTICE](NOTICE) (the Linux notice), [CREDITS.md](../CREDITS.md).

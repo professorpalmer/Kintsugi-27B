@@ -1,4 +1,4 @@
-Kintsugi-27B v1.1 for Linux (x86_64) - notices
+Kintsugi-27B v1.1.1 for Linux (x86_64) - notices
 
 Our files in this bundle (start-server.sh, stop.sh, the layer in layer/, README.md, CREDITS.md and the other text files)
 are licensed under the Apache License, Version 2.0 (see LICENSE).
@@ -42,3 +42,8 @@ Hessians to fit the coded projections and the golden set and scorer to measure t
 made the fits. escha-mlx (Escha Labs, Apache-2.0) reference functions computed the codec tables.
 
 Full credits: CREDITS.md. No person or company named here endorses or sponsors this project.
+
+bin/libgomp.so.1: the GCC OpenMP runtime library (GNU Offloading and Multi Processing Runtime Library),
+unmodified, from the Ubuntu package libgomp1 12.3.0-1ubuntu1~22.04. Licence: GPL-3.0-or-later WITH GCC-exception-3.1 (the
+GCC Runtime Library Exception 3.1); texts in licenses/LICENSE-libgomp-GPL-3.0 and
+licenses/LICENSE-libgomp-GCC-RLE-3.1. Corresponding source: https://launchpad.net/ubuntu/+source/gcc-12/12.3.0-1ubuntu1~22.04
