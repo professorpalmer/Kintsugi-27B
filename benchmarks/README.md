@@ -58,7 +58,7 @@ rented RTX 4070-class 12 GB boxes (Linux).
 
 | Test | Kintsugi-27B | Inkling 2 Mini | Verdict |
 |---|---|---|---|
-| AppWorld test_normal, seeds 100 and 101 (336 task-runs) | **302 / 336** (89.9 %) | 283 / 336 (84.2 %) | Kintsugi is better. Paired sign test on the discordant tasks: 14 vs 33, p = 0.0079. |
+| AppWorld test_normal, fresh seeds 102 and 103 (336 task-runs; corrected 2026-11-21, see the note below) | **294 / 336** (87.5 %) | 283 / 336 (84.2 %) | No significant difference. Kintsugi solved 11 more task-runs; paired sign test on the discordant tasks: 27 vs 16, p = 0.13. |
 | HumanEval 164, medium thinking, pass@1 | 159 / 164 | 160 / 164 | Even (discordant 4 vs 3, p = 1.00). |
 | Retrieval at depth 60,000 (24 needles + 20 exact code copies) | 24 / 24 and 20 / 20 | 24 / 24 and 20 / 20 | Even. |
 | Retrieval at depth 64,000 | 24 / 24 and 20 / 20 | Stopped with CUDA out of memory at the first decode (67,584-token window) | Only Kintsugi. |
@@ -67,6 +67,12 @@ rented RTX 4070-class 12 GB boxes (Linux).
 
 The HumanEval number on the card (161) is from the home RTX 4070. Here, 159 is the same model on the rented box. This
 difference is normal run-to-run spread.
+
+**Correction (2026-11-21).** This table first reported AppWorld on seeds 100 and 101: Kintsugi-27B 302 / 336, Inkling 2
+Mini 283 / 336, "Kintsugi is better, p = 0.0079". Those two seeds were also the seeds on which we chose Kintsugi-27B's
+bit map, so its score on them was biased upward. We reran both models on two fresh seeds (102 and 103) with the same
+settings. Inkling 2 Mini scored 283 again; Kintsugi-27B scored 294. The difference is not significant (p = 0.13), so we
+withdrew the claim that Kintsugi-27B is better on AppWorld.
 
 **Fairness notes**
 

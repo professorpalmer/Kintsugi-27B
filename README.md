@@ -21,7 +21,8 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 - **Runs on RTX 20, 30 and 40 cards** with 12 GB or more.
 - **Fully open**: Apache-2.0 for the model and our files, MIT for the engine. The engine source is in every release.
   The NVIDIA CUDA DLLs in the zip are NVIDIA's (see [NOTICE](NOTICE)).
-- **Head-to-head on one 12 GB card**: against Inkling 2 Mini, AppWorld 302 vs 283 of 336 and 4x the context
+- **Head-to-head on one 12 GB card**: against Inkling 2 Mini, 4x the context, perfect recall at 245k where Inkling
+  cannot load that context, and level on agent tasks (AppWorld 294 vs 283 of 336, not significant; corrected 11-21)
   ([details](benchmarks/README.md#head-to-head-inkling-2-mini-on-the-same-12-gb-card)).
 
 ![Kintsugi-27B](kintsugi-card.png)
