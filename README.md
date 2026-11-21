@@ -13,12 +13,12 @@ the end); pull requests are welcome.
 
 ## What you need
 
-- An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more: for example RTX 2060 12 GB (being verified),
-  3060 12 GB, 3080 12 GB, 3080 Ti, 3090, 4060 Ti 16 GB, 4070 and up, 4090. RTX 50 series (Blackwell) is NOT supported
+- An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more: for example RTX 2060 12 GB, 3060 12 GB, 3080 12 GB, 3080 Ti, 3090, 4060 Ti 16 GB, 4070 and up, 4090. RTX 50 series (Blackwell) is NOT supported
   in this build, by choice: the project targets the cards most people already own. Cards with less than 12 GB can not
   hold the model. On 16-24 GB cards the launcher keeps the whole context in VRAM, so long-context speed is much higher
-  there.
-- A recent NVIDIA driver (the bundle carries its own CUDA 13 runtime; the driver must support CUDA 13).
+  there. Checked on Turing (RTX 20 class, on a card limited to 12 GB), Ampere and Ada: the same results within 1 %.
+- NVIDIA driver 580 or newer (the bundle carries its own CUDA 13 runtime). The launcher stops with a message if the
+  driver is too old.
 - Windows 10 or 11, 64-bit. 32 GB of system RAM or more is best for very long chats.
 - About 11 GB of disk for the model, plus room for saved chats (up to 20 GB, in `slots\`).
 - Optional: Python 3.10 or newer, for saved chats (see below). No extra Python packages are needed.
