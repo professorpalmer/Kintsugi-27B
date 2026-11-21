@@ -6,7 +6,8 @@ Kintsugi-27B is Qwen3.8-27B at 2.47 bits per weight, made to run on one 12 GB NV
 **What is special**
 
 - **2.47 bits per weight**: 27 billion weights in a 10.5 GB file (EXL3 trellis code).
-- **The full 262,144-token context on 12 GB**: the tiered K/V cache keeps the newest part in system RAM.
+- **The full 262,144-token context on 12 GB**: the tiered K/V cache keeps about the first 144k tokens in
+  VRAM and the rest in system RAM.
 - **Saved chats**: a saved 245k-token chat restores in 2.5 s, so a long chat continues after a restart.
 - **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
 - **Runs on RTX 20, 30 and 40 cards** with 12 GB or more.
