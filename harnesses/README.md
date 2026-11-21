@@ -5,7 +5,8 @@ version that we tested, the result, and the minimum settings for each harness.
 
 ## Before you start
 
-1. Start the server (see README.md). Wait for the line `ready  http://127.0.0.1:8080/v1`.
+1. Start the server (see the [bundle guide](../bundle/README.md); in the zip it is `README.md`). Wait for the line
+   `ready  http://127.0.0.1:8080/v1`.
 2. Use these values in the harness:
    - Address: `http://127.0.0.1:8080` (some harnesses need `/v1` at the end; see each harness below).
    - API key: any text, for example `any-key`. The server does not check the key, unless you set

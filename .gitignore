@@ -2,4 +2,8 @@ models/*.gguf
 slots/
 logs/
 bin/
+bundle/models/*.gguf
+bundle/slots/
+bundle/logs/
+bundle/bin/
 __pycache__/
