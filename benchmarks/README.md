@@ -1,8 +1,8 @@
 # Benchmarks: the numbers on the card
 
-All results below are for Kintsugi-27B on our own engine. Some rows were measured on an earlier fit of ours in the
-same format (2.47 bits per weight, within 0.1 % of the same size). Those rows say so. Speed and memory depend on the
-format, the engine and the card, not on the fit. The model file of the release is `Kintsugi-27B-12G.gguf` (sha256
+All results below are for Kintsugi-27B on our own engine. The card's fidelity, decode and restore rows were measured
+again on 2026-11-21 on the exact v1.0.3 bundle (zip sha256 `ac7b3b54...`) with the release file, at the shipped
+settings. The model file of the release is `Kintsugi-27B-12G.gguf` (sha256
 `0510bae82445dc53dbc7d0d842d8b7e146b8eafce0837e39b157d411e48c8a74`).
 
 **Rig:** one RTX 4070 12 GB, Windows 11, display on the integrated GPU, NVIDIA driver 580+ family, MSI Afterburner
@@ -16,10 +16,10 @@ cells in VRAM, two-stage head, MTP draft 3 + lookup drafting, int8 fast read, mi
 | HumanEval 161/164 | HumanEval (OpenAI), all 164 problems; pass@1, one answer for each problem | Plain server (no layer), thinking on with effort "medium", up to 24,576 output tokens, the server's default sampling from the model file (temperature 1.0, top-k 20, top-p 0.95) | RTX 4070 (rig) | 2026-11-20 | **161 / 164 (98.2 %)** |
 | Recall at 245k: 24/24 + 20/20 | 24 needle questions (a fact planted in a long text) and 20 exact copies of a code function, each at a depth of 245,000 tokens | Thinking off, launcher defaults | RTX 4070 (rig) | 2026-11-20 | **24 / 24 needles, 20 / 20 copies** |
 | "also perfect at 117k" | The same 24 + 20 at 117,000 tokens | Another launcher profile (131,072-token window, a DFlash drafter; not in the bundle), thinking off | RTX 4070 (rig) | 2026-11-20 | **24 / 24, 20 / 20** |
-| Fidelity to BF16: 90.9 %, KL 0.056, PPL within 3.3 % | The golden BF16 set of the Qwen3.8-27B quant challenge (StillDeadcode, CC BY 4.0): 295 public documents, 376,086 scored tokens; its KL scorer, ported to our engine | K/V q8_0, all K/V in VRAM, batch 256, scored on generated positions only. Note: the shipped launcher uses q4_0 K/V. A re-measure with the shipped settings is running; this row will then show both. | RTX 4070 (rig) | 2026-11-20 | **same top token 90.934 %, mean KL 0.056398, perplexity ratio 1.0332** |
+| Fidelity to BF16: 90.8 %, KL 0.058, PPL within 3.5 % | The golden BF16 set of the Qwen3.8-27B quant challenge (StillDeadcode, CC BY 4.0): 295 public documents, 376,086 scored tokens; its KL scorer, ported to our engine | **Shipped settings** (the v1.0.3 launcher's engine settings): K/V q4_0, two-stage head, int8 fast read, micro-batch 1,024. The same result with the tiered cache forced to system RAM past 4,096 tokens. For reference, with q8_0 K/V all in VRAM and the exact read: top-1 90.934 %, KL 0.056398, ratio 1.0332. | RTX 4070 (rig) | 2026-11-21 | **same top token 90.787 %, mean KL 0.057864, perplexity ratio 1.0345** |
 | AppWorld 151/168 | AppWorld test_normal (168 tasks), simplified ReAct code agent | Temperature 1.0, effort "medium", 50 steps, seeds 100 and 101; plain server, launcher defaults | Rented RTX 4070 boxes (Linux; quality only, no speed) | 2026-11-20 | **151 / 168 on seed 100 and 151 / 168 on seed 101** (89.9 %). A rerun of seed 101 on another box gave the same 168 outcomes. |
-| Decode 64 / 60 / 44 / 30 tok/s | Decode speed at 64k / 117k / 200k / 245k tokens of context: 400 tokens on each of 3 prompts (code, prose, bash), mean of the 3; a fresh server for each depth | Launcher defaults (MTP draft 3 + lookup). An earlier fit of ours in the same format, on the engine build just before the release engine. On a short check, the release engine gave the same output token for token and the same speed (76.2 vs 76.4 tok/s). | RTX 4070 (rig) | 2026-11-19 | **64.3 / 60.3 / 44.1 / 30.5 tok/s.** Past 143,872 tokens, the K/V cells are in system RAM and stream over PCIe at each step. That is why 200k and 245k are slower. Cold read of a 245k prompt: 589 tok/s (414 s). |
-| Long conversations: 2.5 s | Restore a saved 245,935-token chat after a restart of the server and the layer, then the next turn | Layer on, launcher defaults. An earlier fit of ours in the same format | RTX 4070 (rig) | 2026-11-19 | **Restore 2.49 s; first token of the next answer 9.7 s** (a cold read of 245k takes about 414 s); the same answer as before the restart |
+| Decode 67 / 59 / 49 / 31 tok/s | Decode speed at 64k / 117k / 200k / 245k tokens of context: 400 tokens on each of 3 prompts (code, prose, bash), mean of the 3; a fresh server for each depth; 2 runs | The v1.0.3 launcher's defaults (MTP draft 3 + lookup), plain server (layer off) | RTX 4070 (rig) | 2026-11-21 | **Mean of 2 runs: 66.6 / 59.1 / 48.5 / 31.4 tok/s** (runs: 66.3 + 66.8, 55.3 + 62.8, 48.6 + 48.4, 31.5 + 31.3). At 117k both runs accepted the same draft tokens; run 1's steps were slower for an unknown reason, so its mean is a low estimate. Past 143,872 tokens, the K/V cells are in system RAM and stream over PCIe at each step: that is why 200k and 245k are slower. Cold read of a 245k prompt: 589 tok/s (414 s). |
+| Long conversations: 2.8 s | Restore a saved 245,935-token chat after a restart of the server and the layer, then the next turn | The v1.0.3 bundle, layer on, launcher defaults | RTX 4070 (rig) | 2026-11-21 | **Restore 2.81 s; first token of the next answer 9.8 s** (a cold read of 245k takes about 414 s); the same answer as before the restart |
 | Works with: Claude Code, Codex, Pi, OpenCode | 6 small coding tasks in a small Python repository (see [harnesses/](../harnesses/README.md)) | Bundle v1.0.2 template; through the saved-chat layer and with the plain server | RTX 4070 (rig) | 2026-11-20 | **5 / 6 in each harness, on both paths**; no malformed tool calls, no leaked tags, no loops |
 
 ## Checks on each GPU architecture
@@ -78,4 +78,7 @@ difference is normal run-to-run spread.
 
 - Thinking Machines published results at full precision. We do not compare with those results.
 - This compares the two models on one 12 GB card, which is where most people run them.
+- It compares the best 12 GB build of each that existed on 2026-11-20: our own tuned build of Qwen3.8-27B against
+  Unsloth's public build of Inkling 2 Mini. A build of Inkling made with our methods could score higher. So this is not
+  a verdict on the two base models.
 - We give no speed numbers, because rented boxes are not comparable for speed.

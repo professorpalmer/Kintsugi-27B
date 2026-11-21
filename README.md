@@ -11,7 +11,7 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 - **2.47 bits per weight**: 27 billion weights in a 10.5 GB file (EXL3 trellis code).
 - **The full 262,144-token context on 12 GB**: the tiered K/V cache keeps about the first 144k tokens in
   VRAM and the rest in system RAM.
-- **Saved chats**: a saved 245k-token chat restores in 2.5 s, so a long chat continues after a restart.
+- **Saved chats**: a saved 245k-token chat restores in 2.8 s, so a long chat continues after a restart.
 - **Gated on tasks, not only on KL**: every candidate bit map had to pass long-context recall, long-answer and agent
   tests. Our maps with lower KL failed them and did not ship ([the study](research/bit-allocation/README.md)).
 - **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
