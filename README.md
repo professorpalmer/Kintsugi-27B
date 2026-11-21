@@ -36,11 +36,16 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 
 You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](bundle/README.md).
 
+**Linux (x86_64):** download `Kintsugi-27B-v1.0.4-linux-x86_64.tar.gz` from the same Releases page, then
+`tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
+glibc 2.34+ (Ubuntu 22.04 and 24.04). Full guide: [bundle-linux/README.md](bundle-linux/README.md).
+
 ## Index
 
 | Folder | What is in it |
 |---|---|
 | [bundle/](bundle/README.md) | The user guide, the text files of the Windows zip (launcher, layer, chat template) and the changelog. |
+| [bundle-linux/](bundle-linux/README.md) | The Linux guide and launcher scripts of the Linux tarball (the layer and template are the same as in bundle/). |
 | [harnesses/](harnesses/README.md) | Settings for Claude Code, Codex, Pi and OpenCode, and what we tested. |
 | [model/](model/README.md) | The model file: format, bits, which tensors keep full precision, and what can load it. |
 | [engine/](engine/README.md) | The engine (a llama.cpp fork): where the source is, how to build it, the driver needs. |

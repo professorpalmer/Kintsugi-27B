@@ -5,6 +5,17 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.0.4 (2026-11-21)
+
+- A Linux bundle (x86_64): `Kintsugi-27B-v1.0.4-linux-x86_64.tar.gz`, sha256
+  `19e43162561de515713e52158ade72e8164aa42ba40704ef8f5462033c92b28a`. Same engine features, defaults and checks as
+  the Windows bundle; launcher `start-server.sh`, stop `stop.sh`. Tested on Ubuntu 22.04 and 24.04 (RTX 4070).
+- The Linux engine (`Kintsugi-27B-v1.0.4-engine-src-af70fc544.tar.gz`, sha256
+  `553c2222a156f5734be39206b19cb0bbd084d881bc473c9298d340ad807edd00`) works with NVIDIA drivers 570 and newer: on a
+  driver older than the 580 family it uses another type of pinned system memory and writes one WARN line (tested on
+  driver 570.133, RTX 2080 Ti).
+- Windows: no change. The Windows zip stays the v1.0.3 file.
+
 ## v1.0.3 (2026-11-20)
 
 - The launcher checks the NVIDIA driver before it starts. With a driver older than 580, it stops and tells you to
