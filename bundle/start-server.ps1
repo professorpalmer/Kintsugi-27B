@@ -14,7 +14,9 @@
 #   KINTSUGI_KV            K/V cache type: q4_0 (default) | q8_0 | q3_0
 #   KINTSUGI_MARGIN        MiB kept free under the card's limit (default 250 with no display on the card, 600 with one)
 #   KINTSUGI_CELLS         K/V cells in VRAM (skips the arithmetic below)
-#   KINTSUGI_DRAFT         draft size of the MTP drafter (default 3; 0 = no drafting)
+#   KINTSUGI_DRAFT         auto (default: DFlash2 draft 7 when the drafter file is there, else MTP 3 + lookup) | dflash |
+#                          mtp | off; a number = the MTP draft size (0 = no drafting)
+#   KINTSUGI_DRAFTER       DFlash2 drafter file (default models\dflash-Qwen3.8-27B-Q4_0.gguf; an optional download)
 #   KINTSUGI_THINK         medium (default) | off
 #   KINTSUGI_READ          fast (default: int8 read of long prompts) | exact
 #   KINTSUGI_HEAD2         two-stage output head: exact candidates for each row (default 512; 0 = off)
@@ -54,6 +56,16 @@ function Stop-NoGpu($Message) {
     exit 1
 }
 
+# The size of a file, also when the path is a symbolic link to it (Get-Item gives the link's own length then).
+function FileLength($path) {
+    $it = Get-Item -LiteralPath $path
+    for ($n = 0; $n -lt 8 -and $it.LinkType -eq 'SymbolicLink'; $n++) {
+        $t = @($it.Target)[0]
+        if (-not [IO.Path]::IsPathRooted($t)) { $t = Join-Path (Split-Path -Parent $it.FullName) $t }
+        $it = Get-Item -LiteralPath $t
+    }
+    $it.Length
+}
 $Model = Pick 'MODEL' (Join-Path $Root 'models\Kintsugi-27B-12G.gguf')
 $Bin = Join-Path $Root 'bin'
 $Ctx = [int](Pick 'CTX' 262144)
@@ -93,19 +105,56 @@ $TotalMiB = [int]$q[0]; $UsedMiB = [int]$q[1]; $Headless = $q[2].Trim() -ne 'Ena
 if ($TotalMiB -lt 11500) { Write-Host "note   this card has $TotalMiB MiB; Kintsugi-27B is made for 12 GB cards and may not load" }
 # Margin under the card's limit, on top of the measured growth (a display on the card moves by itself, so more margin).
 $Margin = [int](Pick 'MARGIN' $(if ($Headless) { 250 } else { 600 }))
+$MarginWhy = if (Pick 'MARGIN' '') { 'KINTSUGI_MARGIN' } elseif ($Headless) { 'no display on this card' } else { 'display on this card: nvidia-smi display_active; KINTSUGI_MARGIN=250 if that is wrong' }
 # Fixed footprint at load without the K/V cells (measured on an RTX 4070 with the 10,546,686,688-byte file); a model file
 # of another size moves it by the difference.
-$HeadMiB = [int][math]::Round(((Get-Item $Model).Length - 10546686688) / 1MB)
+$HeadMiB = [int][math]::Round(((FileLength $Model) - 10546686688) / 1MB)
 # Two-stage output head (default 512 candidates): the exact Q8_0 head goes to system RAM, a small first stage stays in
 # VRAM (606 MiB saved at load). The text is the same as with the full head on our tests.
+# ---- Drafting: DFlash2 (draft 7) when its drafter file is there, else the model's own MTP block (draft 3) + lookup ------
+# The DFlash2 drafter is an optional download (models\dflash-Qwen3.8-27B-Q4_0.gguf, see README.md). It takes about 0.8 GB
+# of VRAM, so fewer K/V cells fit in VRAM; measured on an RTX 4070 with these settings: about +25 to +35 % decode at
+# 4k-64k tokens, about +23 % at 117k, the same speed at 245k.
+$Drafter = Pick 'DRAFTER' (Join-Path $Root 'models\dflash-Qwen3.8-27B-Q4_0.gguf')
+$DraftSet = (Pick 'DRAFT' 'auto').ToLower()
+$DraftNote = ''
+if ($DraftSet -match '^\d+$') { $Mode = if ([int]$DraftSet -gt 0) { 'mtp' } else { 'off' }; $MtpDraft = [int]$DraftSet }
+else {
+    $MtpDraft = 3
+    switch ($DraftSet) {
+        'auto'   { $Mode = if (Test-Path $Drafter) { 'dflash' } else { 'mtp' }
+                   if ($Mode -eq 'mtp') { $DraftNote = "note   DFlash2 drafter not found ($Drafter): MTP + lookup drafting. For about 25-35 % faster decode up to ~64k tokens (about 23 % at 117k), download dflash-Qwen3.8-27B-Q4_0.gguf from https://huggingface.co/CaryPalmer/Kintsugi-27B into models\" } }
+        'dflash' { if (-not (Test-Path $Drafter)) { throw "DFlash2 drafter not found: $Drafter (set KINTSUGI_DRAFTER, or KINTSUGI_DRAFT=auto)" }; $Mode = 'dflash' }
+        'mtp'    { $Mode = 'mtp' }
+        'off'    { $Mode = 'off' }
+        default  { throw "KINTSUGI_DRAFT must be auto, dflash, mtp, off or a number" }
+    }
+}
 $Head2 = [int](Pick 'HEAD2' 512)
 $Head2MiB = if ($Head2 -gt 0) { 606 } else { 0 }
-$Fixed = 9473 + $HeadMiB - $Head2MiB
+# With DFlash2 (draft micro-batch 64): 10,238 MiB at load for the 1,094,346,080-byte drafter (rig, 2026-11-19); another
+# drafter file moves it by the difference.
+$DrafterMiB = if ($Mode -eq 'dflash') { 765 + [int][math]::Round(((FileLength $Drafter) - 1094346080) / 1MB) } else { 0 }
+$Fixed = 9473 + $HeadMiB - $Head2MiB + $DrafterMiB
 # The first request adds about 222 MiB once (cuBLAS, kernel code at first use); the warm-up request pays it at start.
-$Growth = 222
-# Windows keeps part of the card: past about 97.7 % of it the driver moves memory to system RAM without an error and
-# everything slows down (the "spill" below). KINTSUGI_CEILING_MIB overrides.
-$Ceiling = [int](Pick 'CEILING_MIB' ([math]::Floor($TotalMiB * 0.977)))
+# Requests of many new lengths then add up to about 210 MiB (CUDA graphs); the margin covers that. With DFlash2, 128 MiB
+# more: Linux needs about 50 MiB more for it than Windows, and the rest keeps the peak 64 MiB or more under the limit.
+$Growth = 222 + $(if ($Mode -eq 'dflash') { 128 } else { 0 })
+# The driver keeps part of the card for itself ("Reserved" in nvidia-smi -q; 272 MiB on an RTX 4070 with Windows, 416 MiB
+# on one with Linux). Past the rest, Windows moves memory to system RAM without an error and everything slows down (the
+# "spill" below). Ceiling = the smaller of 97.7 % of the card and the card less the reserved part less 8 MiB.
+# If nvidia-smi does not show the reserved part, 512 MiB is assumed. KINTSUGI_CEILING_MIB overrides.
+$ReservedMiB = $null; $InFb = $false
+foreach ($l in @(& nvidia-smi -q -d MEMORY -i 0 2>$null)) {
+    if ($l -match 'FB Memory Usage') { $InFb = $true }
+    elseif ($InFb -and $l -match '^\s*Reserved\s*:\s*(\d+)\s*MiB') { $ReservedMiB = [int]$Matches[1]; break }
+    elseif ($InFb -and $l -match 'Memory Usage') { break }
+}
+if ($null -eq $ReservedMiB) {
+    $ReservedMiB = 512
+    Write-Host "note   nvidia-smi does not show the card's reserved memory: 512 MiB assumed (KINTSUGI_CEILING_MIB overrides)"
+}
+$Ceiling = [int](Pick 'CEILING_MIB' ([math]::Min([math]::Floor($TotalMiB * 0.977), $TotalMiB - $ReservedMiB - 8)))
 # Staging in VRAM = one layer's K and V of the cells in system RAM = (window - cells) x cell / 16.
 function CellsFor($fixed) {
     $budget = ([math]::Min($TotalMiB, $Ceiling) - $UsedMiB - $Margin - $fixed - $Growth) * 1MB - $Ctx * $Cell / 16
@@ -125,15 +174,18 @@ if ($Cells -lt $Ctx -and ($Ctx % 32768) -ne 0) {
 if ($Cells -le 3328) { Write-Host "note   only $Cells K/V cells fit in VRAM: decode reads most of the K/V cache from system RAM (close other programs that use the card)" }
 
 # ---- Drafting: the model's own MTP block (draft 3) + lookup drafting out of the prompt -----------------------------------
-$Draft = [int](Pick 'DRAFT' 3)
+$Draft = if ($Mode -eq 'mtp') { $MtpDraft } elseif ($Mode -eq 'dflash') { 7 } else { 0 }
 $Spec = @()
-if ($Draft -gt 0) {
+if ($Mode -eq 'dflash') {
+    $Spec = @('--spec-type', 'draft-dflash', '-md', ('"' + $Drafter + '"'), '--spec-draft-n-max', '7', '-ctkd', 'q4_0', '-ctvd', 'q4_0')
+} elseif ($Draft -gt 0) {
     $Spec = @('--spec-type', 'ngram-mod,draft-mtp', '--spec-draft-n-max', "$Draft", '--spec-draft-n-max-tail', "$([math]::Max(4, $Draft))",
               '-ctkd', 'q8_0', '-ctvd', 'q8_0', '--spec-lookup-n-max', '32', '--spec-draft-window', '16384')
 }
 
 # ---- Engine switches -------------------------------------------------------------------------------------------------
 $env:GGML_CUDA_BATCH_INVARIANT = '1'          # a token's output does not depend on the batch it runs in
+if ($Mode -eq 'dflash' -and -not $env:LLAMA_DFLASH_DRAFT_UBATCH) { $env:LLAMA_DFLASH_DRAFT_UBATCH = '64' }
 if ($Draft -gt 0) { $env:LLAMA_RS_REPLAY = '1'; $env:GGML_CUDA_SHARED_POOL = '1'; if (-not $env:LLAMA_MTP_DRAFT_UBATCH) { $env:LLAMA_MTP_DRAFT_UBATCH = '256' } }
 $env:LLAMA_ARG_CHECKPOINT_EVERY_NT = '8192'
 if (-not $env:GGML_CUDA_POOL_RESERVE_MIB) { $env:GGML_CUDA_POOL_RESERVE_MIB = '96' }
@@ -200,10 +252,11 @@ if ($Extra) { $SrvArgs += $Extra.Split(' ') }
 Write-Host "Kintsugi-27B"
 Write-Host "model  $(Split-Path $Model -Leaf)"
 Write-Host "listen $ListenHost`:$Port$(if ($UseLayer) { " (layer; llama-server on 127.0.0.1:$ServerPort)" })$(if ($KeyFile) { ", API key on" })"
-Write-Host "kv     $Kv, tiered: cells 0..$Cells in VRAM, $Cells..$Ctx in system RAM (free $($TotalMiB - $UsedMiB) MiB, ceiling $Ceiling, fixed $Fixed, growth $Growth, margin $Margin$(if ($Headless) { ', no display on this card' }))"
+Write-Host "kv     $Kv, tiered: cells 0..$Cells in VRAM, $Cells..$Ctx in system RAM (free $($TotalMiB - $UsedMiB) MiB, reserved $ReservedMiB, ceiling $Ceiling, fixed $Fixed, growth $Growth, margin $Margin ($MarginWhy))"
 Write-Host "template $(if ($Template -eq 'model') { 'the model file''s own' } else { $Template })"
 if ($Head2 -gt 0) { Write-Host "head   two-stage: first stage q4_0 in VRAM, $Head2 exact candidates for each row from system RAM" }
-Write-Host "spec   $(if ($Draft -le 0) { 'off' } else { "MTP draft $Draft + lookup" }); thinking $Think; read $($env:GGML_ESCHA_PREFILL)"
+Write-Host "spec   $(if ($Mode -eq 'off') { 'off' } elseif ($Mode -eq 'dflash') { "DFlash2 draft 7 ($(Split-Path $Drafter -Leaf))" } else { "MTP draft $Draft + lookup" }); thinking $Think; read $($env:GGML_ESCHA_PREFILL)"
+if ($DraftNote) { Write-Host $DraftNote }
 if ($DryRun) { Write-Host ("args   " + ($SrvArgs -join ' ')); exit 0 }
 
 $logs = Join-Path $Root 'logs'; New-Item -ItemType Directory -Force $logs | Out-Null

@@ -10,7 +10,10 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 
 - **2.47 bits per weight**: 27 billion weights in a 10.5 GB file (EXL3 trellis code).
 - **The full 262,144-token context on 12 GB**: the tiered K/V cache keeps about the first 144k tokens in
-  VRAM and the rest in system RAM.
+  VRAM (about 90k with the optional drafter) and the rest in system RAM.
+- **Optional faster decode (v1.1)**: with the DFlash2 drafter file (1.1 GB, Hugging Face), about 25-35 % faster
+  decode at 4k-64k tokens and about 23 % at 117k (RTX 4070, the shipped settings); the same greedy outputs on RTX
+  30 / 40.
 - **Saved chats**: a saved 245k-token chat restores in 2.8 s, so a long chat continues after a restart.
 - **Gated on tasks, not only on KL**: every candidate bit map had to pass long-context recall, long-answer and agent
   tests. Our maps with lower KL failed them and did not ship ([the study](research/bit-allocation/README.md)).
@@ -28,7 +31,8 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 1. Download the zip from [Releases (latest)](https://github.com/professorpalmer/Kintsugi-27B/releases/latest) and
    unzip it, for example to `C:\Kintsugi`.
 2. Download `Kintsugi-27B-12G.gguf` from [Hugging Face](https://huggingface.co/CaryPalmer/Kintsugi-27B).
-3. Put the file in the `models` folder of the bundle.
+3. Put the file in the `models` folder of the bundle. Optional: also download `dflash-Qwen3.8-27B-Q4_0.gguf` from the
+   same page into `models` for faster decode (the launcher uses it when it is there).
 4. In PowerShell, in that folder: `powershell -ExecutionPolicy Bypass -File start-server.ps1 -Wait`. Wait for the
    line `ready  http://127.0.0.1:8080/v1`.
 5. Open http://127.0.0.1:8080/ in a browser, or point an OpenAI-compatible app or a coding harness at
@@ -36,7 +40,7 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 
 You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](bundle/README.md).
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.0.4-linux-x86_64.tar.gz` from the same Releases page, then
+**Linux (x86_64):** download `Kintsugi-27B-v1.1-linux-x86_64.tar.gz` from the same Releases page, then
 `tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
 glibc 2.34+ (Ubuntu 22.04 and 24.04). Full guide: [bundle-linux/README.md](bundle-linux/README.md).
 

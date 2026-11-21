@@ -53,8 +53,8 @@ Kintsugi-27B stands on a lot of other people's work. If we missed you, tell us a
 - **syv-ai / HyperQwen**: the idea to draft out of the prompt (lookup drafting), on in this bundle.
 - **Jian Chen, Yesheng Liang, Zhijian Liu (z-lab, DFlash)**: block-diffusion speculative decoding.
 - **Inco AI**: the DFlash2 drafter for Qwen3.8-27B (Apache-2.0).
-- **ggml-org**: the GGUF conversion of that drafter. (The DFlash profiles are in our development builds, not in this
-  release bundle.)
+- **ggml-org**: the Q4_0 GGUF conversion of that drafter, which the launcher uses when you download it (optional,
+  from the model page).
 - **Magnitude (magnitudedev)**: mixed K / V cache types on the tensor-core path. (Credited for the idea; that option is
   under test and not in this build.)
 
@@ -73,5 +73,10 @@ HumanEval (OpenAI), AppWorld (Trivedi et al., Stony Brook NLP), WikiText-2 (Meri
 Cary Palmer ([professorpalmer](https://github.com/professorpalmer)): the fits, the bit map search, the clean rebuild,
 the engine port and kernels, the tiered K/V cache, the two-stage head, the launcher, the tool layer, and the
 measurements.
+
+## Citations
+
+DFlash 2 (Inco AI, 2026, https://inco.ai/blog/dflash2/) and DFlash: Block Diffusion for Flash Speculative Decoding
+(Jian Chen, Yesheng Liang, Zhijian Liu; ICML 2026). The drafter's card asks for both citations.
 
 No person or company above endorses or sponsors this project.

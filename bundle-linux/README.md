@@ -1,4 +1,4 @@
-# Kintsugi-27B v1.0.4 for Linux (x86_64, RTX 20 / 30 / 40, 12 GB)
+# Kintsugi-27B v1.1 for Linux (x86_64, RTX 20 / 30 / 40, 12 GB)
 
 These are the text files of the Linux tarball; download the tarball from
 [Releases](https://github.com/professorpalmer/Kintsugi-27B/releases/latest). The tarball also holds the engine
@@ -45,6 +45,16 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
 4. Chat (below). The server listens only on this computer.
 5. Stop it: `./stop.sh`.
 
+## Faster decode (optional download)
+
+Download `dflash-Qwen3.8-27B-Q4_0.gguf` (1.1 GB) from https://huggingface.co/CaryPalmer/Kintsugi-27B into the `models/`
+folder. At the next start the launcher uses it (the `spec` line says "DFlash2 draft 7"). On an RTX 4070 (the shipped
+settings) decode is about 25-35 % faster at 4k-64k tokens of context, about 23 % faster at 117k, and the same at 245k.
+Without the file the launcher uses the model's own MTP drafter, as before, and prints one note. The answers are the same
+with either drafter. To choose by hand: `KINTSUGI_DRAFT=mtp ./start-server.sh --wait` (or `dflash`, `off`).
+
+The drafter is Inco AI's DFlash2 in ggml-org's Q4_0 GGUF, unchanged (Apache-2.0; see NOTICE and CREDITS.md).
+
 ## How to chat
 
 - **In the browser:** open http://127.0.0.1:8080/.
@@ -71,7 +81,9 @@ then also set `KINTSUGI_KEY_FILE` to a file holding an API key. Logs are in `log
 - The first read of a very long prompt takes about 7 minutes for 245k tokens on an RTX 4070; later turns read only the
   new text.
 - One chat at a time (one slot).
-- Tested on Ubuntu 22.04 and 24.04 with an RTX 4070 (drivers of the 580 and 610 families). The fallback for 570
-  drivers was tested on an RTX 2080 Ti (driver 570.133). Built on Ubuntu 22.04 with GCC 11.
+- On RTX 20 (Turing) cards, drafting (MTP or DFlash2) is not bit-identical to one-token decoding: near ties can round
+  the other way in the verify path. The fidelity is the same (our Turing KL check). On RTX 30 / 40 it is bit-identical.
+- Tested with an RTX 4070 on Ubuntu 22.04 (drivers 580.178 and 595.91) and 24.04 (driver 615.71). The fallback for
+  570 drivers was tested on an RTX 2080 Ti (driver 570.133). Built on Ubuntu 22.04 with GCC 11.
 
 Licences and credits: [LICENSE](../LICENSE), [NOTICE](NOTICE) (the Linux notice), [CREDITS.md](../CREDITS.md).

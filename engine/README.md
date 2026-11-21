@@ -10,17 +10,24 @@ Kintsugi-27B model file. It adds:
   are in pinned system RAM, in one CUDA address range. This is how the full 262,144-token context fits a 12 GB card.
 - **A two-stage output head** (`LLAMA_HEAD2=N`): a small q4_0 copy of the head in VRAM reads all rows; the exact Q8_0
   rows in system RAM score the N best candidates again.
-- **Drafting**: the model's own MTP head at every depth, and lookup drafting from the prompt.
+- **Drafting**: the model's own MTP head at every depth, lookup drafting from the prompt, and DFlash2 block drafting
+  with a separate drafter file (`--spec-type draft-dflash -md <file>`; the bundle uses it when the file is there).
 - **Batch-invariant kernels** (`GGML_CUDA_BATCH_INVARIANT=1`): the output for a token does not change with the batch
   it runs in.
 - **Saved chats**: slot saves in the background, and delta saves (each save holds only the new part).
 
 ## Source
 
-The source of each release build is a release asset:
-[`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`](https://github.com/professorpalmer/Kintsugi-27B/releases/latest)
-(37,358,085 bytes, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`). It is the engine of
-bundles v1 to v1.0.3. Licence: MIT, the same as llama.cpp (`LICENSE` in the tar).
+The source of each release build is a release asset. Licence: MIT, the same as llama.cpp (`LICENSE` in the tar).
+
+| Engine | Bundles | Source asset | sha256 |
+|---|---|---|---|
+| `5f393adb5` | v1.1 (Windows and Linux) | `Kintsugi-27B-v1.1-engine-src-5f393adb5.tar.gz` (37,360,262 bytes) | `ded8fd4ee8c67c1088b173bd49a21ab201a1407d1ee64b2bcd01f9d3ebcaf4a6` |
+| `af70fc544` | v1.0.4 (Linux) | `Kintsugi-27B-v1.0.4-engine-src-af70fc544.tar.gz` (37,359,975 bytes) | `553c2222a156f5734be39206b19cb0bbd084d881bc473c9298d340ad807edd00` |
+| `c07efbec5` | v1 to v1.0.3 (Windows) | `Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz` (37,358,085 bytes) | `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7` |
+
+`5f393adb5` = `af70fc544` + one fix: the spill check at load writes its warning only when the GPU memory is at its
+limit (before, pinned system memory of the tiered cache could give a false "spill at load").
 
 ## Build
 
@@ -42,11 +49,12 @@ cmake --build build --target llama-server llama-perplexity test-backend-ops
 
 - **Windows bundle:** it carries the CUDA 13 runtime, which needs driver 580 or newer. From v1.0.3, the launcher stops
   with a message on an older driver.
+- **Linux bundle:** it carries the CUDA 12.8 runtime and works with driver 570 or newer (see the fallback below).
 - **Your own build with CUDA 12.x:** CUDA 12.x itself runs on older drivers. But drivers older than the 580 family
   (for example 570) refuse the default type of pinned system memory that the tiered K/V cache uses. Thus the c07efbec5
   engine does not load on them.
-- **In the next engine release:** a fallback. If the driver refuses the default host memory type, the engine uses the
-  host NUMA type and writes one WARN line. If the driver refuses both, the load stops with "update the NVIDIA driver
+- **From engine `af70fc544` (Linux v1.0.4, all v1.1 bundles):** a fallback. If the driver refuses the default host
+  memory type, the engine uses the host NUMA type and writes one WARN line. If the driver refuses both, the load stops with "update the NVIDIA driver
   to 580 or newer". We checked it on driver 570.133 (Linux, RTX 2080 Ti): the model loads, and tool calls work. Test
   switch: `GGML_CUDA_HOSTMEM_FORCE=host|numa|pinned`.
 

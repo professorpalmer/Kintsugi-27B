@@ -16,7 +16,9 @@
 #   KINTSUGI_KV            K/V cache type: q4_0 (default) | q8_0 | q3_0
 #   KINTSUGI_MARGIN        MiB kept free under the card's limit (default 250 with no display on the card, 600 with one)
 #   KINTSUGI_CELLS         K/V cells in VRAM (skips the arithmetic below)
-#   KINTSUGI_DRAFT         draft size of the MTP drafter (default 3; 0 = no drafting)
+#   KINTSUGI_DRAFT         auto (default: DFlash2 draft 7 when the drafter file is there, else MTP 3 + lookup) | dflash |
+#                          mtp | off; a number = the MTP draft size (0 = no drafting)
+#   KINTSUGI_DRAFTER       DFlash2 drafter file (default models/dflash-Qwen3.8-27B-Q4_0.gguf; an optional download)
 #   KINTSUGI_THINK         medium (default) | off
 #   KINTSUGI_READ          fast (default: int8 read of long prompts) | exact
 #   KINTSUGI_HEAD2         two-stage output head: exact candidates for each row (default 512; 0 = off)
@@ -107,15 +109,49 @@ GFX=$(nvidia-smi 2> /dev/null | grep -c -E '^\|[[:space:]]+[0-9]+[[:space:]]+[^[
 HEADLESS=1; [ "${GFX:-0}" -gt 0 ] && HEADLESS=0
 [ "$TOTAL" -lt 11500 ] && echo "note   this card has $TOTAL MiB; Kintsugi-27B is made for 12 GB cards and may not load"
 MARGIN="$(pick MARGIN $([ $HEADLESS = 1 ] && echo 250 || echo 600))"
+if [ -n "$(pick MARGIN '')" ]; then MARGIN_WHY="KINTSUGI_MARGIN"; elif [ $HEADLESS = 1 ]; then MARGIN_WHY="no display on this card"; else MARGIN_WHY="display on this card: a graphics process in nvidia-smi; KINTSUGI_MARGIN=250 if that is wrong"; fi
 # Fixed footprint at load without the K/V cells (measured on an RTX 4070 with the 10,546,686,688-byte file); a model file
 # of another size moves it by the difference.
 SIZE=$(stat -L -c %s "$MODEL")   # -L: the size of the model file itself, also when $MODEL is a symlink
 HEAD_MIB=$(( (SIZE - 10546686688) / 1048576 ))
+# ---- Drafting: DFlash2 (draft 7) when its drafter file is there, else the model's own MTP block (draft 3) + lookup ------
+# The DFlash2 drafter is an optional download (models/dflash-Qwen3.8-27B-Q4_0.gguf, see README.md). It takes about 0.8 GB
+# of VRAM, so fewer K/V cells fit in VRAM; measured on an RTX 4070 with these settings: about +25 to +35 % decode at
+# 4k-64k tokens, about +23 % at 117k, the same speed at 245k.
+DRAFTER="$(pick DRAFTER "$ROOT/models/dflash-Qwen3.8-27B-Q4_0.gguf")"
+DRAFT_SET="$(pick DRAFT auto | tr '[:upper:]' '[:lower:]')"
+DRAFT_NOTE=""; MTP_DRAFT=3
+case "$DRAFT_SET" in
+  auto)   if [ -f "$DRAFTER" ]; then MODE=dflash; else MODE=mtp
+            DRAFT_NOTE="note   DFlash2 drafter not found ($DRAFTER): MTP + lookup drafting. For about 25-35 % faster decode up to ~64k tokens (about 23 % at 117k), download dflash-Qwen3.8-27B-Q4_0.gguf from https://huggingface.co/CaryPalmer/Kintsugi-27B into models/"; fi ;;
+  dflash) [ -f "$DRAFTER" ] || { echo "DFlash2 drafter not found: $DRAFTER (set KINTSUGI_DRAFTER, or KINTSUGI_DRAFT=auto)"; exit 1; }; MODE=dflash ;;
+  mtp)    MODE=mtp ;;
+  off)    MODE=off ;;
+  *[!0-9]*|"") echo "KINTSUGI_DRAFT must be auto, dflash, mtp, off or a number"; exit 1 ;;
+  *)      MTP_DRAFT=$DRAFT_SET; if [ "$MTP_DRAFT" -gt 0 ]; then MODE=mtp; else MODE=off; fi ;;
+esac
 HEAD2="$(pick HEAD2 512)"
 HEAD2_MIB=0; [ "$HEAD2" -gt 0 ] && HEAD2_MIB=606
-FIXED=$((9473 + HEAD_MIB - HEAD2_MIB))
-GROWTH=222
-CEILING="$(pick CEILING_MIB $((TOTAL * 977 / 1000)))"
+# With DFlash2 (draft micro-batch 64): 10,238 MiB at load for the 1,094,346,080-byte drafter (RTX 4070); another drafter
+# file moves it by the difference.
+DRAFTER_MIB=0
+[ "$MODE" = dflash ] && DRAFTER_MIB=$(( 765 + ($(stat -L -c %s "$DRAFTER") - 1094346080) / 1048576 ))
+FIXED=$((9473 + HEAD_MIB - HEAD2_MIB + DRAFTER_MIB))
+# The first request adds about 222 MiB once (cuBLAS, kernel code at first use); the warm-up request pays it at start.
+# Requests of many new lengths then add up to about 210 MiB (CUDA graphs); the margin covers that. With DFlash2, 128 MiB
+# more: Linux needs about 50 MiB more for it than Windows, and the rest keeps the peak 64 MiB or more under the limit.
+GROWTH=222; [ "$MODE" = dflash ] && GROWTH=$((222 + 128))
+# The driver keeps part of the card for itself ("Reserved" in nvidia-smi -q; 416 MiB on an RTX 4070 with Linux driver 595,
+# 272 MiB with Windows). No program can use it: past the rest, an allocation fails (out of memory). Ceiling = the smaller
+# of 97.7 % of the card and the card less the reserved part less 8 MiB. If nvidia-smi does not show the reserved part,
+# 512 MiB is assumed. KINTSUGI_CEILING_MIB overrides.
+RESERVED=$(nvidia-smi -q -d MEMORY -i 0 2> /dev/null | awk '/FB Memory Usage/ { fb = 1; next } fb && /Memory Usage/ { exit } fb && $1 == "Reserved" { print $3; exit }' | tr -dc '0-9')
+if [ -z "$RESERVED" ]; then
+  RESERVED=512
+  echo "note   nvidia-smi does not show the card's reserved memory: 512 MiB assumed (KINTSUGI_CEILING_MIB overrides)"
+fi
+CEIL_A=$((TOTAL * 977 / 1000)); CEIL_B=$((TOTAL - RESERVED - 8)); [ "$CEIL_B" -lt "$CEIL_A" ] && CEIL_A=$CEIL_B
+CEILING="$(pick CEILING_MIB $CEIL_A)"
 cells_for() {   # cells_for FIXED: K/V cells that fit in VRAM (staging = one layer's K and V of the cells in system RAM)
   local lim=$TOTAL; [ "$CEILING" -lt "$lim" ] && lim=$CEILING
   local budget=$(( (lim - USED - MARGIN - $1 - GROWTH) * 1048576 - CTX * CELL / 16 ))
@@ -135,10 +171,12 @@ if [ "$CELLS" -lt "$CTX" ] && [ $((CTX % 32768)) -ne 0 ]; then
 fi
 [ "$CELLS" -le 3328 ] && echo "note   only $CELLS K/V cells fit in VRAM: decode reads most of the K/V cache from system RAM (close other programs that use the card)"
 
-# ---- Drafting: the model's own MTP block (draft 3) + lookup drafting out of the prompt -----------------------------------
-DRAFT="$(pick DRAFT 3)"
+# ---- Drafting arguments ----------------------------------------------------------------------------------------------
+DRAFT=0; [ "$MODE" = mtp ] && DRAFT=$MTP_DRAFT; [ "$MODE" = dflash ] && DRAFT=7
 SPEC=()
-if [ "$DRAFT" -gt 0 ]; then
+if [ "$MODE" = dflash ]; then
+  SPEC=(--spec-type draft-dflash -md "$DRAFTER" --spec-draft-n-max 7 -ctkd q4_0 -ctvd q4_0)
+elif [ "$DRAFT" -gt 0 ]; then
   TAIL=$DRAFT; [ "$TAIL" -lt 4 ] && TAIL=4
   SPEC=(--spec-type ngram-mod,draft-mtp --spec-draft-n-max "$DRAFT" --spec-draft-n-max-tail "$TAIL"
         -ctkd q8_0 -ctvd q8_0 --spec-lookup-n-max 32 --spec-draft-window 16384)
@@ -146,6 +184,7 @@ fi
 
 # ---- Engine switches -------------------------------------------------------------------------------------------------
 export GGML_CUDA_BATCH_INVARIANT=1
+[ "$MODE" = dflash ] && export LLAMA_DFLASH_DRAFT_UBATCH="${LLAMA_DFLASH_DRAFT_UBATCH:-64}"
 if [ "$DRAFT" -gt 0 ]; then export LLAMA_RS_REPLAY=1 GGML_CUDA_SHARED_POOL=1; export LLAMA_MTP_DRAFT_UBATCH="${LLAMA_MTP_DRAFT_UBATCH:-256}"; fi
 export LLAMA_ARG_CHECKPOINT_EVERY_NT=8192
 export GGML_CUDA_POOL_RESERVE_MIB="${GGML_CUDA_POOL_RESERVE_MIB:-96}"
@@ -208,10 +247,12 @@ EXTRA="$(pick EXTRA '')"
 echo "Kintsugi-27B"
 echo "model  $(basename "$MODEL")"
 echo "listen $LISTEN:$PORT$([ $USE_LAYER = 1 ] && echo " (layer; llama-server on 127.0.0.1:$SERVER_PORT)")$([ -n "$KEY_FILE" ] && echo ", API key on")"
-echo "kv     $KV, tiered: cells 0..$CELLS in VRAM, $CELLS..$CTX in system RAM (free $((TOTAL - USED)) MiB, ceiling $CEILING, fixed $FIXED, growth $GROWTH, margin $MARGIN$([ $HEADLESS = 1 ] && echo ', no display on this card'))"
+echo "kv     $KV, tiered: cells 0..$CELLS in VRAM, $CELLS..$CTX in system RAM (free $((TOTAL - USED)) MiB, reserved $RESERVED, ceiling $CEILING, fixed $FIXED, growth $GROWTH, margin $MARGIN ($MARGIN_WHY))"
 echo "template $([ "$TEMPLATE" = model ] && echo "the model file's own" || echo "$TEMPLATE")"
 [ "$HEAD2" -gt 0 ] && echo "head   two-stage: first stage q4_0 in VRAM, $HEAD2 exact candidates for each row from system RAM"
-echo "spec   $([ "$DRAFT" -le 0 ] && echo off || echo "MTP draft $DRAFT + lookup"); thinking $THINK; read $GGML_ESCHA_PREFILL"
+case "$MODE" in off) SPEC_TXT=off ;; dflash) SPEC_TXT="DFlash2 draft 7 ($(basename "$DRAFTER"))" ;; *) SPEC_TXT="MTP draft $DRAFT + lookup" ;; esac
+echo "spec   $SPEC_TXT; thinking $THINK; read $GGML_ESCHA_PREFILL"
+[ -n "$DRAFT_NOTE" ] && echo "$DRAFT_NOTE"
 if [ $DRY = 1 ]; then echo "args   ${ARGS[*]}"; exit 0; fi
 
 LOGS="$ROOT/logs"; mkdir -p "$LOGS"

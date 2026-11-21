@@ -1,4 +1,4 @@
-Kintsugi-27B v1.0.4 for Linux (x86_64) - notices
+Kintsugi-27B v1.1 for Linux (x86_64) - notices
 
 Our files in this bundle (start-server.sh, stop.sh, the layer in layer/, README.md, CREDITS.md and the other text files)
 are licensed under the Apache License, Version 2.0 (see LICENSE).
@@ -20,14 +20,19 @@ Third-party software in this bundle:
    The fork's changes (the Escha / EXL3 trellis op, the tiered K/V cache, the two-stage output head, background saves,
    the host-memory fallback for older drivers and the other serving changes) are under the same MIT License. The Escha
    op for ggml comes from Ajay9o9's llama.cpp-escha (MIT). The engine source of this build is a release asset
-   (Kintsugi-27B-v1.0.4-engine-src-af70fc544.tar.gz).
+   (Kintsugi-27B-v1.1-engine-src-5f393adb5.tar.gz).
 
 2. NVIDIA CUDA 12.8 runtime libraries in bin/ (libcudart.so.12, libcublas.so.12, libcublasLt.so.12) are NVIDIA's
    binaries, redistributed unmodified under the NVIDIA CUDA Toolkit End User License Agreement
    (https://docs.nvidia.com/cuda/eula/), which lists them as redistributable. They are not covered by our licences and
    are not open source. The NVIDIA driver (libcuda) is not in this bundle; it comes with your driver installation.
 
-3. The layer (layer/) comes from our own Bonsai / Mirai serving layer. Its sandbox tools (off in this build) would use
+3. The optional DFlash2 drafter (not in this bundle; models/dflash-Qwen3.8-27B-Q4_0.gguf, downloaded separately from
+   the model page): Inco AI's DFlash2 for Qwen3.8-27B (https://huggingface.co/incoai/Qwen3.8-27B-DFlash2), in the Q4_0
+   GGUF of ggml-org (https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF, revision cc54a8a3), unchanged. Apache License,
+   Version 2.0 (the same text as LICENSE). Please cite DFlash 2 and DFlash (CREDITS.md).
+
+4. The layer (layer/) comes from our own Bonsai / Mirai serving layer. Its sandbox tools (off in this build) would use
    the Python package wasmtime (Bytecode Alliance, Apache-2.0 WITH LLVM-exception); it is not in this bundle and not
    needed.
 

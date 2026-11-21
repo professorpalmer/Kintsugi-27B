@@ -40,6 +40,16 @@ end). Pull requests are welcome.
 4. Chat (see "How to chat" below). The server listens only on this computer.
 5. To stop it: `powershell -ExecutionPolicy Bypass -File stop.ps1`.
 
+## Faster decode (optional download)
+
+Download `dflash-Qwen3.8-27B-Q4_0.gguf` (1.1 GB) from https://huggingface.co/CaryPalmer/Kintsugi-27B into the `models`
+folder. At the next start the launcher uses it (the `spec` line says "DFlash2 draft 7"). On an RTX 4070 (the shipped
+settings) decode is about 25-35 % faster at 4k-64k tokens of context, about 23 % faster at 117k, and the same at 245k.
+Without the file the launcher uses the model's own MTP drafter, as before, and prints one note. The answers are the same
+with either drafter. To choose by hand: `$env:KINTSUGI_DRAFT = 'mtp'` (or `dflash`, `off`).
+
+The drafter is Inco AI's DFlash2 in ggml-org's Q4_0 GGUF, unchanged (Apache-2.0; see NOTICE and CREDITS.md).
+
 ## How to chat
 
 - **In the browser:** open http://127.0.0.1:8080/ (the chat page that comes with the server).
@@ -108,6 +118,8 @@ How the answers felt (long-document answers, chat after a restart, code, tools):
   shorter answer.
 - One chat at a time (one slot). By default, the server listens on 127.0.0.1 only.
 - RTX 50 series (Blackwell) is not built in this release, by choice.
+- On RTX 20 (Turing) cards, drafting (MTP or DFlash2) is not bit-identical to one-token decoding: near ties can round
+  the other way in the verify path. The fidelity is the same (our Turing KL check). On RTX 30 / 40 it is bit-identical.
 
 ## Files in this folder
 

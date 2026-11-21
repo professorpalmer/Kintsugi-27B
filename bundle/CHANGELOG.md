@@ -5,6 +5,29 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.1 (2026-11-21)
+
+- **Faster decode with an optional drafter.** Download `dflash-Qwen3.8-27B-Q4_0.gguf` (1.1 GB) from [Hugging
+  Face](https://huggingface.co/CaryPalmer/Kintsugi-27B) into `models`. The launcher then uses it (the `spec` line says
+  "DFlash2 draft 7"): on an RTX 4070 (the shipped settings), about 25-35 % faster decode at 4k-64k tokens of context,
+  about 23 % at 117k, and the same speed at 245k. Without the file, the launcher uses MTP + lookup as before and prints
+  one note. `KINTSUGI_DRAFT=mtp|dflash|off` chooses by hand. The drafter is Inco AI's DFlash2 in ggml-org's Q4_0 GGUF,
+  unchanged (Apache-2.0).
+- **The launcher reads the memory that the NVIDIA driver keeps for itself** ("reserved" in the `kv` line: 272 MiB on
+  our Windows RTX 4070, about 410 MiB on Linux RTX 4070s) and keeps the server under the rest. Before, on a card with a
+  large reservation, the server could stop with "out of memory" a few requests after the start (seen on Linux with the
+  drafter). With the drafter, the launcher also keeps 128 MiB more room for the CUDA graphs of drafting.
+- The engine (`5f393adb5`) works with NVIDIA drivers that refuse the default pinned-memory type (Linux 570): it uses
+  another type and writes one WARN line. No false "spill at load" message when the GPU memory has room left.
+- The `kv` line says why it chose its memory margin. A model file reached through a symbolic link is sized correctly.
+- On RTX 20 (Turing) cards, drafting (MTP or DFlash2) is not bit-identical to one-token decoding (near ties can round
+  the other way); the fidelity is the same. On RTX 30 / 40 it is bit-identical.
+- Windows: `Kintsugi-27B-v1.1-win-x64.zip`, sha256 `20660dcdb2f28d5a58a527ca0d1a4e9a82568f53e6877232c292dfb1c631d8e9`.
+- Linux: `Kintsugi-27B-v1.1-linux-x86_64.tar.gz`, sha256
+  `e03537ecfc0e53d7ff13e3c6bcec1bea74547a301d13c4d497d9d3b1542b4079`.
+- Engine source: `Kintsugi-27B-v1.1-engine-src-5f393adb5.tar.gz`, sha256
+  `ded8fd4ee8c67c1088b173bd49a21ab201a1407d1ee64b2bcd01f9d3ebcaf4a6`.
+
 ## v1.0.4 (2026-11-21)
 
 - A Linux bundle (x86_64): `Kintsugi-27B-v1.0.4-linux-x86_64.tar.gz`, sha256
