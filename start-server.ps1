@@ -38,6 +38,21 @@ function Pick($name, $default) {
     }
     $default
 }
+# A driver too old for CUDA 13 (or no CUDA device) does not stop the engine: it runs on the CPU, very slowly, and still
+# answers. Returns the stop message when the server log shows that, else $null.
+function Get-NoGpuMessage($LogPath) {
+    if (-not (Test-Path $LogPath)) { return $null }
+    if (Select-String -Path $LogPath -SimpleMatch -Pattern 'failed to initialize CUDA', 'no usable GPU found' -Quiet) {
+        return "the engine could not use the GPU (see $LogPath): update the NVIDIA driver to 580 or newer"
+    }
+    $null
+}
+function Stop-NoGpu($Message) {
+    if ($p) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+    if ($lp) { Stop-Process -Id $lp.Id -Force -ErrorAction SilentlyContinue }
+    Write-Host $Message
+    exit 1
+}
 
 $Model = Pick 'MODEL' (Join-Path $Root 'models\Kintsugi-27B-12G.gguf')
 $Bin = Join-Path $Root 'bin'
@@ -53,6 +68,21 @@ if (-not (Test-Path $Model)) {
 }
 if (-not (Test-Path (Join-Path $Bin 'llama-server.exe'))) { throw "llama-server.exe not found in $Bin" }
 if (-not (Get-Command nvidia-smi -ErrorAction SilentlyContinue)) { throw "nvidia-smi not found: install the NVIDIA driver" }
+
+# ---- NVIDIA driver: the CUDA 13 runtime in bin\ needs driver 580 or newer ---------------------------------------------
+# KINTSUGI_TEST_DRIVER=<version> replaces the value that nvidia-smi gives (tests).
+$Driver = Pick 'TEST_DRIVER' ''
+if (-not $Driver) {
+    try { $Driver = "$((& nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>$null) | Select-Object -First 1)".Trim() } catch { $Driver = '' }
+}
+if ($Driver -match '^(\d+)\.') {
+    if ([int]$Matches[1] -lt 580) {
+        Write-Host "NVIDIA driver $Driver is too old: Kintsugi needs driver 580 or newer (CUDA 13). Update the driver, then start again."
+        exit 1
+    }
+} else {
+    Write-Host "WARN   could not read the NVIDIA driver version from nvidia-smi: the driver check is skipped"
+}
 
 # ---- VRAM line: how many K/V cells fit in VRAM; the rest of the window lives in system RAM -----------------------------
 $HalfBytes = @{ 'q8_0' = 17408; 'q4_0' = 9216; 'q3_0' = 7168 }   # bytes of K (or of V) per cell, all attention layers
@@ -196,11 +226,20 @@ if ($UseLayer) {
     Write-Host "layer  pid $($lp.Id)   log $layerLog   clients use :$Port; saved conversations in $SlotDir"
 }
 Write-Host "stop   powershell -ExecutionPolicy Bypass -File `"$(Join-Path $Root 'stop.ps1')`""
+if (-not $Wait) {
+    # No wait for the load: the engine writes its GPU set-up to the log before the model load starts.
+    for ($i = 0; $i -lt 60; $i++) {
+        if ($p.HasExited -or (Select-String -Path $log -SimpleMatch -Pattern 'load_model: loading model' -Quiet -ErrorAction SilentlyContinue)) { break }
+        Start-Sleep 1
+    }
+    $m = Get-NoGpuMessage $log; if ($m) { Stop-NoGpu $m }
+}
 if ($Wait) {
     for ($i = 0; $i -lt 150; $i++) {
         $up = $false
         try { $up = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 "http://127.0.0.1:$Port/health").StatusCode -eq 200 } catch { }
         if ($up) {
+            $m = Get-NoGpuMessage $log; if ($m) { Stop-NoGpu $m }
             # Warm-up request (about 1,100 tokens in, 8 out): the engine takes its first-use memory now, so the VRAM printed
             # below is the peak, and a shortage shows here and not later.
             $text = (1..110 | ForEach-Object { "Entry $_ of the log has nothing to report." }) -join ' '
@@ -225,7 +264,7 @@ if ($Wait) {
             }
             Write-Host "ready  http://127.0.0.1:$Port/v1"; exit 0
         }
-        if ($p.HasExited) { Write-Host "server stopped during load: see $log"; exit 1 }
+        if ($p.HasExited) { $m = Get-NoGpuMessage $log; if ($m) { Stop-NoGpu $m }; Write-Host "server stopped during load: see $log"; exit 1 }
         if ($lp -and $lp.HasExited) { Write-Host "layer stopped: see $layerLog"; exit 1 }
         Start-Sleep 2
     }

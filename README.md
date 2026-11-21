@@ -1,4 +1,4 @@
-# Kintsugi-27B v1.0.2 (Windows, RTX 20 / 30 / 40, 12 GB)
+# Kintsugi-27B v1.0.3 (Windows, RTX 20 / 30 / 40, 12 GB)
 
 ![Kintsugi-27B](kintsugi-card.png)
 
@@ -110,6 +110,8 @@ How the answers felt (long-document answers, chat after a restart, code, tools):
 
 ## Changes
 
+- v1.0.3: the launcher stops with a clear message when the NVIDIA driver is too old or the GPU is not used (before,
+  the server could run slowly on the CPU)
 - v1.0.2: works with Claude Code and OpenAI Codex (a chat template fix for system or developer messages after the
   first one). Tested with Claude Code, Codex, Pi and OpenCode: see HARNESSES.md
 - v1.0.1: the layer streams /v1/messages and /v1/responses live (Claude Code, Codex); API-key headers forwarded;
