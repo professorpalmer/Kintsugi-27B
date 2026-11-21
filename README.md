@@ -40,6 +40,7 @@ You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](
 | [model/](model/README.md) | The model file: format, bits, which tensors keep full precision, and what can load it. |
 | [engine/](engine/README.md) | The engine (a llama.cpp fork): where the source is, how to build it, the driver needs. |
 | [benchmarks/](benchmarks/README.md) | Each number on the card: the test, the settings, the card and the date. |
+| [research/](research/README.md) | Finished studies: bit allocation, harness gate, old drivers, long-context decode, cross-architecture, clean rebuild. |
 
 Licences: [LICENSE](LICENSE) (Apache-2.0) and [NOTICE](NOTICE). Credits: [CREDITS.md](CREDITS.md). Problems,
 numbers from your card and fixes: please open an issue or a pull request.
