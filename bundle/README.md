@@ -1,24 +1,23 @@
 # Kintsugi-27B bundle: user guide (Windows, RTX 20 / 30 / 40, 12 GB)
 
-These are the text files of the Windows zip; download the zip from
-[Releases](https://github.com/professorpalmer/Kintsugi-27B/releases/latest). The zip also holds the engine
-(`bin\`), which is not in this folder. Changes per version: [CHANGELOG.md](CHANGELOG.md).
+This folder holds the text files of the Windows zip. Download the zip from
+[Releases](https://github.com/professorpalmer/Kintsugi-27B/releases/latest). The zip also holds the engine (`bin\`),
+which is not in this folder. The changes in each version are in [CHANGELOG.md](CHANGELOG.md).
 
-Kintsugi-27B is Qwen3.8-27B at 2.47 bits per weight, built to run on one 12 GB NVIDIA card with the full
-262,144-token context. Part of the long context lives in system RAM, so a long chat works on 12 GB. Free to use for
-anything, under Apache-2.0. Found a problem or have numbers from your card? Please open a GitHub issue (template at
-the end); pull requests are welcome.
-
-**Download:** the Windows bundle (engine, launcher, saved-chat layer) is on the
-[Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases); the model file is on
-[Hugging Face](https://huggingface.co/CaryPalmer/Kintsugi-27B).
+Kintsugi-27B is Qwen3.8-27B at 2.47 bits per weight. It runs on one 12 GB NVIDIA card with the full 262,144-token
+context. Part of the long context is in system RAM, so a long chat works on 12 GB. You can use it for anything, under
+Apache-2.0. If you find a problem or have numbers from your card, please open a GitHub issue (the template is at the
+end). Pull requests are welcome.
 
 ## What you need
 
-- An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more: for example RTX 2060 12 GB, 3060 12 GB, 3080 12 GB, 3080 Ti, 3090, 4060 Ti 16 GB, 4070 and up, 4090. RTX 50 series (Blackwell) is NOT supported
-  in this build, by choice: the project targets the cards most people already own. Cards with less than 12 GB can not
-  hold the model. On 16-24 GB cards the launcher keeps the whole context in VRAM, so long-context speed is much higher
-  there. Checked on Turing (RTX 20 class, on a card limited to 12 GB), Ampere and Ada: the same results within 1 %.
+- An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more. Examples: RTX 2060 12 GB, 3060 12 GB, 3080 12 GB,
+  3080 Ti, 3090, 4060 Ti 16 GB, 4070 and up, 4090.
+  - RTX 50 series (Blackwell) is NOT supported in this build, by choice. The project targets the cards that most people
+    already have.
+  - Cards with less than 12 GB cannot hold the model.
+  - On 16-24 GB cards, the launcher keeps the whole context in VRAM, so long-context speed is much higher.
+  - We checked Turing (RTX 20 class, on a card limited to 12 GB), Ampere and Ada: the results are the same within 1 %.
 - NVIDIA driver 580 or newer (the bundle carries its own CUDA 13 runtime). The launcher stops with a message if the
   driver is too old.
 - Windows 10 or 11, 64-bit. 32 GB of system RAM or more is best for very long chats.
@@ -28,10 +27,9 @@ the end); pull requests are welcome.
 ## Download and start
 
 1. Download the bundle zip from the Releases page and unzip it to a folder, for example `C:\Kintsugi`.
-2. Download `Kintsugi-27B-12G.gguf` from https://huggingface.co/CaryPalmer/Kintsugi-27B and put
-   it in the `models` folder. Its SHA-256 is
-   `0510bae82445dc53dbc7d0d842d8b7e146b8eafce0837e39b157d411e48c8a74`; check it in PowerShell with
-   `Get-FileHash models\Kintsugi-27B-12G.gguf`.
+2. Download `Kintsugi-27B-12G.gguf` from [Hugging Face](https://huggingface.co/CaryPalmer/Kintsugi-27B). Put it in
+   the `models` folder. Its SHA-256 is `0510bae82445dc53dbc7d0d842d8b7e146b8eafce0837e39b157d411e48c8a74`. To check
+   it, run `Get-FileHash models\Kintsugi-27B-12G.gguf` in PowerShell.
 3. Open PowerShell in the folder and start the server:
 
    ```
@@ -54,14 +52,14 @@ the end); pull requests are welcome.
   curl.exe http://127.0.0.1:8080/v1/chat/completions -H "Content-Type: application/json" -d '{\"messages\":[{\"role\":\"user\",\"content\":\"Hello! Who are you?\"}]}'
   ```
 
-Saved chats: with Python 3.10 or newer in PATH (no extra packages), the start also runs a small layer in front of
-the server. It saves a long chat to disk after each answer, so after a restart the next turn of that chat starts in
-seconds, not minutes. Without Python, the server runs plain and the start prints a note; everything else works.
+**Saved chats:** with Python 3.10 or newer in PATH (no extra packages), the start also runs a small layer in front of
+the server. The layer saves a long chat to disk after each answer. After a restart, the next turn of that chat starts
+in seconds, not minutes. Without Python, the server runs plain and the start prints a note. Everything else works.
 
-Settings are environment variables, for example `$env:KINTSUGI_CTX = 131072` before the start. The list is at the top
-of [start-server.ps1](start-server.ps1). By default only this computer can connect. `$env:KINTSUGI_HOST = '0.0.0.0'`
-opens it to your network: if you do that, also set `$env:KINTSUGI_KEY_FILE` to a file holding an API key, or anyone on
-your network can use your GPU.
+**Settings** are environment variables. For example, set `$env:KINTSUGI_CTX = 131072` before the start. The list is at
+the top of [start-server.ps1](start-server.ps1). By default, only this computer can connect.
+`$env:KINTSUGI_HOST = '0.0.0.0'` opens the server to your network. If you do that, also set `$env:KINTSUGI_KEY_FILE`
+to a file that holds an API key. If you do not, anyone on your network can use your GPU.
 
 ## What to try
 
@@ -108,7 +106,7 @@ How the answers felt (long-document answers, chat after a restart, code, tools):
   the same chat read only the new text.
 - Very long reasoning answers can be less faithful than short ones. If an answer goes off track, ask again or ask for a
   shorter answer.
-- One chat at a time (one slot). The server listens on 127.0.0.1 only.
+- One chat at a time (one slot). By default, the server listens on 127.0.0.1 only.
 - RTX 50 series (Blackwell) is not built in this release, by choice.
 
 ## Files in this folder

@@ -42,10 +42,10 @@ cmake --build build --target llama-server llama-perplexity test-backend-ops
 
 - **Windows bundle:** it carries the CUDA 13 runtime, which needs driver 580 or newer. From v1.0.3, the launcher stops
   with a message on an older driver.
-- **Your own build with CUDA 12.x:** it runs on older drivers, but drivers older than the 580 family (for example 570)
-  refuse the default type of pinned system memory that the tiered K/V cache uses, and the c07efbec5 engine does not
-  load there.
-- **In the next engine release:** a fallback. When the driver refuses the default host memory type, the engine uses the
+- **Your own build with CUDA 12.x:** CUDA 12.x itself runs on older drivers. But drivers older than the 580 family
+  (for example 570) refuse the default type of pinned system memory that the tiered K/V cache uses. Thus the c07efbec5
+  engine does not load on them.
+- **In the next engine release:** a fallback. If the driver refuses the default host memory type, the engine uses the
   host NUMA type and writes one WARN line. If the driver refuses both, the load stops with "update the NVIDIA driver
   to 580 or newer". We checked it on driver 570.133 (Linux, RTX 2080 Ti): the model loads, and tool calls work. Test
   switch: `GGML_CUDA_HOSTMEM_FORCE=host|numa|pinned`.

@@ -11,8 +11,10 @@ Kintsugi-27B is Qwen3.8-27B at 2.47 bits per weight, made to run on one 12 GB NV
 - **Saved chats**: a saved 245k-token chat restores in 2.5 s, so a long chat continues after a restart.
 - **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
 - **Runs on RTX 20, 30 and 40 cards** with 12 GB or more.
-- **Fully open**: Apache-2.0 for the model and our files, MIT for the engine, with the engine source in every release
-  (the NVIDIA CUDA DLLs in the zip are NVIDIA's; see NOTICE).
+- **Fully open**: Apache-2.0 for the model and our files, MIT for the engine. The engine source is in every release.
+  The NVIDIA CUDA DLLs in the zip are NVIDIA's (see [NOTICE](NOTICE)).
+- **Head-to-head on one 12 GB card**: against Inkling 2 Mini, AppWorld 302 vs 283 of 336 and 4x the context
+  ([details](benchmarks/README.md#head-to-head-inkling-2-mini-on-the-same-12-gb-card)).
 
 ![Kintsugi-27B](kintsugi-card.png)
 

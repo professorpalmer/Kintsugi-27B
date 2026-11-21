@@ -122,8 +122,8 @@ OpenCode reads `%USERPROFILE%\.config\opencode\opencode.json`. Put this text in 
 }
 ```
 
-Then start OpenCode with `opencode` (the `model` line in the file selects Kintsugi). For one task without the screen,
-use `opencode run -m kintsugi/kintsugi "your task"`.
+Then start OpenCode with `opencode` (the `model` line in the file selects Kintsugi). To run one task without the
+interactive screen, use `opencode run -m kintsugi/kintsugi "your task"`.
 
 At its first start, OpenCode downloads the package `@ai-sdk/openai-compatible` from npm.
 
