@@ -18,8 +18,8 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 - **Gated on tasks, not only on KL**: every candidate bit map had to pass long-context recall, long-answer and agent
   tests. Our maps with lower KL failed them and did not ship ([the study](research/bit-allocation/README.md)).
 - **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
-- **Runs on RTX 20, 30 and 40 cards** with 12 GB or more. **Coming soon:** RTX 50 (Blackwell), H100 (Hopper) and a
-  native Apple Silicon (Mac) version. AMD (ROCm / HIP) support is in progress. Intel GPUs are not supported yet. Stock
+- **Runs on RTX 20, 30 and 40 cards** with 12 GB or more, and **on Apple Silicon Macs** ([mac/](mac/README.md): chat
+  and an OpenAI-compatible server; tested on an M5 Max). **Coming soon:** RTX 50 (Blackwell) and H100 (Hopper). AMD (ROCm / HIP) support is in progress. Intel GPUs are not supported yet. Stock
   llama.cpp, Ollama and LM Studio cannot load this file.
 - **Fully open**: Apache-2.0 for the model and our files, MIT for the engine. The engine source is in every release.
   The NVIDIA CUDA DLLs in the zip are NVIDIA's (see [NOTICE](NOTICE)).
@@ -47,12 +47,18 @@ You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](
 `tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
 glibc 2.34+ (Ubuntu 22.04 and 24.04); no other libraries. Full guide: [bundle-linux/README.md](bundle-linux/README.md).
 
+**Mac (Apple Silicon):** `git clone https://github.com/professorpalmer/Kintsugi-27B.git`, then `cd Kintsugi-27B/mac`
+and `./run.sh install` (it downloads the model and converts it), then `./run.sh chat` or `./run.sh serve`. On an M5 Max
+(48 GB): about 76 tok/s output at 4k with MTP, a context of about 259k tokens, 24/24 needles at 259k. Tested on that one Mac
+only; 16 GB Macs and M1 to M4 are untested on real hardware. Full guide: [mac/README.md](mac/README.md).
+
 ## Index
 
 | Folder | What is in it |
 |---|---|
 | [bundle/](bundle/README.md) | The user guide, the text files of the Windows zip (launcher, layer, chat template) and the changelog. |
 | [bundle-linux/](bundle-linux/README.md) | The Linux guide and launcher scripts of the Linux tarball (the layer and template are the same as in bundle/). |
+| [mac/](mac/README.md) | The Apple Silicon kit: install, chat and an OpenAI-compatible server on a Mac (MLX), with its own checks. |
 | [harnesses/](harnesses/README.md) | Settings for Claude Code, Codex, Pi and OpenCode, and what we tested. |
 | [model/](model/README.md) | The model file: format, bits, which tensors keep full precision, and what can load it. |
 | [engine/](engine/README.md) | The engine (a llama.cpp fork): where the source is, how to build it, the driver needs. |

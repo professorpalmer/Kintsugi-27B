@@ -1,0 +1,182 @@
+{
+ "format": "radiance-kld-top-1",
+ "model": "Qwen/Qwen3.8-27B",
+ "n_vocab": 248320,
+ "top": 512,
+ "rows": 20192,
+ "top_parts": [
+  "top.bin.part00",
+  "top.bin.part01"
+ ],
+ "docs": [
+  {
+   "source": "fineweb2-hq/spa_Latn",
+   "tokens": 390,
+   "score_from": 0,
+   "row0": 0,
+   "public_doc": 4
+  },
+  {
+   "source": "stackv2-edu",
+   "tokens": 791,
+   "score_from": 0,
+   "row0": 389,
+   "public_doc": 6
+  },
+  {
+   "source": "fineweb2-hq/tur_Latn",
+   "tokens": 1175,
+   "score_from": 0,
+   "row0": 1179,
+   "public_doc": 10
+  },
+  {
+   "source": "fineweb-edu",
+   "tokens": 1285,
+   "score_from": 0,
+   "row0": 2353,
+   "public_doc": 18
+  },
+  {
+   "source": "glaive-fc-v2",
+   "tokens": 690,
+   "score_from": 0,
+   "row0": 3637,
+   "public_doc": 24
+  },
+  {
+   "source": "wildchat",
+   "tokens": 643,
+   "score_from": 0,
+   "row0": 4326,
+   "public_doc": 28
+  },
+  {
+   "source": "finemath-4plus",
+   "tokens": 499,
+   "score_from": 0,
+   "row0": 4968,
+   "public_doc": 34
+  },
+  {
+   "source": "fineweb2-hq/cmn_Hani",
+   "tokens": 377,
+   "score_from": 0,
+   "row0": 5466,
+   "public_doc": 38
+  },
+  {
+   "source": "stackexchange",
+   "tokens": 637,
+   "score_from": 0,
+   "row0": 5842,
+   "public_doc": 40
+  },
+  {
+   "source": "libretexts",
+   "tokens": 1752,
+   "score_from": 0,
+   "row0": 6478,
+   "public_doc": 44
+  },
+  {
+   "source": "smoltalk2/systemchats",
+   "tokens": 340,
+   "score_from": 0,
+   "row0": 8229,
+   "public_doc": 46
+  },
+  {
+   "source": "wikimedia",
+   "tokens": 363,
+   "score_from": 0,
+   "row0": 8568,
+   "public_doc": 72
+  },
+  {
+   "source": "fineweb2-hq/ces_Latn",
+   "tokens": 854,
+   "score_from": 0,
+   "row0": 8930,
+   "public_doc": 96
+  },
+  {
+   "source": "fineweb2-hq/rus_Cyrl",
+   "tokens": 400,
+   "score_from": 0,
+   "row0": 9783,
+   "public_doc": 108
+  },
+  {
+   "source": "when2call",
+   "tokens": 567,
+   "score_from": 0,
+   "row0": 10182,
+   "public_doc": 116
+  },
+  {
+   "source": "fineweb2-hq/arb_Arab",
+   "tokens": 356,
+   "score_from": 0,
+   "row0": 10748,
+   "public_doc": 144
+  },
+  {
+   "source": "smoltalk2/everyday",
+   "tokens": 1580,
+   "score_from": 0,
+   "row0": 11103,
+   "public_doc": 146
+  },
+  {
+   "source": "hermes-fc",
+   "tokens": 837,
+   "score_from": 0,
+   "row0": 12682,
+   "public_doc": 160
+  },
+  {
+   "source": "the-stack-smol-xl",
+   "tokens": 1698,
+   "score_from": 0,
+   "row0": 13518,
+   "public_doc": 166
+  },
+  {
+   "source": "fineweb2-hq/ind_Latn",
+   "tokens": 526,
+   "score_from": 0,
+   "row0": 15215,
+   "public_doc": 176
+  },
+  {
+   "source": "fineweb2-hq/ell_Grek",
+   "tokens": 613,
+   "score_from": 0,
+   "row0": 15740,
+   "public_doc": 192
+  },
+  {
+   "source": "wikipedia/he",
+   "tokens": 1540,
+   "score_from": 0,
+   "row0": 16352,
+   "public_doc": 238
+  },
+  {
+   "source": "fineweb2-hq/dan_Latn",
+   "tokens": 1187,
+   "score_from": 0,
+   "row0": 17891,
+   "public_doc": 246
+  },
+  {
+   "source": "doab",
+   "tokens": 1116,
+   "score_from": 0,
+   "row0": 19077,
+   "public_doc": 248
+  }
+ ],
+ "source": "StillDeadcode/qwen3.8-27b-quant-challenge, golden/public (CC BY 4.0); a subset of 24 documents, rows re-based; content unchanged"
+}

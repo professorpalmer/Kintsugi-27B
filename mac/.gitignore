@@ -1,0 +1,13 @@
+.venv/
+escha-mlx/
+models/
+out/
+work/
+logs/
+results/
+results-*.zip
+__pycache__/
+*.pyc
+*.gguf
+*.part
+.DS_Store

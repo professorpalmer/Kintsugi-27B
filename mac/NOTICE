@@ -1,0 +1,15 @@
+Kintsugi-27B for Mac (the mac/ folder of github.com/professorpalmer/Kintsugi-27B)
+Copyright 2026 the Kintsugi-27B project
+
+This product includes or modifies software and data from:
+
+- escha-mlx, Copyright Escha Labs, Apache License 2.0 (https://github.com/EschaLabs/escha-mlx).
+  patches/escha-mlx-69f7218-kintsugi.patch modifies escha_mlx/quant.py, escha_mlx/models/qwen3_5.py and
+  escha_mlx/mtp.py and adds tests/test_kintsugi_grouped.py; each changed file carries a change notice.
+  template/ holds configuration and tokenizer files of the EschaLabs/Qwen3.8-27B-Escha-W2 export (Apache License 2.0),
+  which derive from Qwen/Qwen3.8-27B (Apache License 2.0).
+- Qwen3.8-27B quant challenge by StillDeadcode, CC BY 4.0
+  (https://huggingface.co/datasets/StillDeadcode/qwen3.8-27b-quant-challenge). golden-mini/ is a subset (24 documents)
+  of golden/public; rows were re-based, values were not changed.
+- llama.cpp / ggml, Copyright The ggml authors, MIT License (licenses/llama.cpp-MIT.txt), including the Escha op by
+  Ajay9o9 (llama.cpp-escha, MIT); tools/engine_escha.c copies parts of its CPU code.

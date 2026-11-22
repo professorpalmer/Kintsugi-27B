@@ -1,0 +1,519 @@
+{
+  "escha_mlx_commit": "69f72187d93d74e281eeb1044f3ef95dfce671de",
+  "started": "2026-11-20 19:23:58",
+  "G1": {
+    "projections": 400,
+    "failures": [],
+    "pass": true
+  },
+  "G3": {
+    "classes": {
+      "norm": {
+        "tensors": 161,
+        "values": 668672,
+        "values_not_equal": 0,
+        "max_abs_err": 0.0
+      },
+      "ssm_a = -exp(A_log)": {
+        "tensors": 48,
+        "values": 2304,
+        "values_not_equal": 0,
+        "max_abs_err": 0.0
+      },
+      "dt_bias": {
+        "tensors": 48,
+        "values": 2304,
+        "values_not_equal": 0,
+        "max_abs_err": 0.0
+      },
+      "conv1d": {
+        "tensors": 48,
+        "values": 1966080,
+        "values_not_equal": 1508,
+        "max_abs_err": 2.9802322387695312e-08
+      },
+      "linear_attn.norm": {
+        "tensors": 48,
+        "values": 6144,
+        "values_not_equal": 0,
+        "max_abs_err": 0.0
+      },
+      "in_proj_a/b": {
+        "tensors": 96,
+        "values": 23592960,
+        "values_not_equal": 0,
+        "max_abs_err": 0.0
+      },
+      "mtp norm": {
+        "tensors": 7,
+        "values": 26112,
+        "values_not_equal": 0,
+        "max_abs_err": 0.0
+      }
+    },
+    "pass": false
+  },
+  "G4a": {
+    "tensors": {
+      "token_embd.weight": {
+        "rows": 248320,
+        "values_not_equal": 0
+      },
+      "output.weight": {
+        "rows": 248320,
+        "values_not_equal": 0
+      }
+    },
+    "pass": true
+  },
+  "G4b": {
+    "tensors": {
+      "mtp.fc": {
+        "shape": [
+          5120,
+          10240
+        ],
+        "values_not_equal": 0,
+        "bits_not_equal": 3349153,
+        "bits_not_equal_signed_zero_only": 3349153
+      },
+      "mtp.layers.0.self_attn.q_proj": {
+        "shape": [
+          12288,
+          5120
+        ],
+        "values_not_equal": 0,
+        "bits_not_equal": 3766521,
+        "bits_not_equal_signed_zero_only": 3766521
+      },
+      "mtp.layers.0.self_attn.k_proj": {
+        "shape": [
+          1024,
+          5120
+        ],
+        "values_not_equal": 0,
+        "bits_not_equal": 333871,
+        "bits_not_equal_signed_zero_only": 333871
+      },
+      "mtp.layers.0.self_attn.v_proj": {
+        "shape": [
+          1024,
+          5120
+        ],
+        "values_not_equal": 0,
+        "bits_not_equal": 328718,
+        "bits_not_equal_signed_zero_only": 328718
+      },
+      "mtp.layers.0.self_attn.o_proj": {
+        "shape": [
+          5120,
+          6144
+        ],
+        "values_not_equal": 0,
+        "bits_not_equal": 2159135,
+        "bits_not_equal_signed_zero_only": 2159135
+      },
+      "mtp.layers.0.mlp.gate_proj": {
+        "shape": [
+          17408,
+          5120
+        ],
+        "values_not_equal": 0,
+        "bits_not_equal": 5245416,
+        "bits_not_equal_signed_zero_only": 5245416
+      },
+      "mtp.layers.0.mlp.up_proj": {
+        "shape": [
+          17408,
+          5120
+        ],
+        "values_not_equal": 0,
+        "bits_not_equal": 5265085,
+        "bits_not_equal_signed_zero_only": 5265085
+      },
+      "mtp.layers.0.mlp.down_proj": {
+        "shape": [
+          5120,
+          17408
+        ],
+        "values_not_equal": 0,
+        "bits_not_equal": 6026836,
+        "bits_not_equal_signed_zero_only": 6026836
+      }
+    },
+    "n": 8,
+    "pass": true
+  },
+  "G5": {
+    "K_mismatch": [],
+    "gguf_tokens": 248320,
+    "hf_vocab_entries": 248077,
+    "token_text_mismatch": 0,
+    "chat_template_equal": true,
+    "tokenizer_config_template_equal": true,
+    "K_counts": {
+      "K2": 227,
+      "K3": 173
+    },
+    "pass": true
+  },
+  "D1": {
+    "cos_right_order": 0.9045524001121521,
+    "cos_gguf_order": 0.03821239992976189,
+    "cos_qk_part": 0.904889702796936
+  },
+  "G2": {
+    "layers": [
+      0,
+      3,
+      34,
+      63
+    ],
+    "rows": [
+      {
+        "projection": "model.language_model.layers.0.linear_attn.in_proj_qkv",
+        "K": 2,
+        "shape": [
+          5120,
+          10240
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00029422863735817373,
+        "linear_max_abs": 0.003208160400390625,
+        "seconds": 5.1
+      },
+      {
+        "projection": "model.language_model.layers.0.linear_attn.in_proj_z",
+        "K": 3,
+        "shape": [
+          5120,
+          6144
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002927265886683017,
+        "linear_max_abs": 0.0017714500427246094,
+        "seconds": 3.2
+      },
+      {
+        "projection": "model.language_model.layers.0.linear_attn.out_proj",
+        "K": 3,
+        "shape": [
+          6144,
+          5120
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002989479689858854,
+        "linear_max_abs": 0.008819580078125,
+        "seconds": 2.4
+      },
+      {
+        "projection": "model.language_model.layers.0.mlp.gate_proj",
+        "K": 2,
+        "shape": [
+          5120,
+          17408
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002962492872029543,
+        "linear_max_abs": 0.001332998275756836,
+        "seconds": 6.3
+      },
+      {
+        "projection": "model.language_model.layers.0.mlp.up_proj",
+        "K": 2,
+        "shape": [
+          5120,
+          17408
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002948756446130574,
+        "linear_max_abs": 0.001210927963256836,
+        "seconds": 6.6
+      },
+      {
+        "projection": "model.language_model.layers.0.mlp.down_proj",
+        "K": 3,
+        "shape": [
+          17408,
+          5120
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00029037860804237425,
+        "linear_max_abs": 0.0052490234375,
+        "seconds": 7.0
+      },
+      {
+        "projection": "model.language_model.layers.3.self_attn.q_proj",
+        "K": 2,
+        "shape": [
+          5120,
+          12288
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00029014857136644423,
+        "linear_max_abs": 0.002415180206298828,
+        "seconds": 4.4
+      },
+      {
+        "projection": "model.language_model.layers.3.self_attn.k_proj",
+        "K": 3,
+        "shape": [
+          5120,
+          1024
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00028766144532710314,
+        "linear_max_abs": 0.0014712810516357422,
+        "seconds": 0.4
+      },
+      {
+        "projection": "model.language_model.layers.3.self_attn.v_proj",
+        "K": 3,
+        "shape": [
+          5120,
+          1024
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002889621537178755,
+        "linear_max_abs": 0.0016286373138427734,
+        "seconds": 0.4
+      },
+      {
+        "projection": "model.language_model.layers.3.self_attn.o_proj",
+        "K": 2,
+        "shape": [
+          6144,
+          5120
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002974666131194681,
+        "linear_max_abs": 0.008081436157226562,
+        "seconds": 2.1
+      },
+      {
+        "projection": "model.language_model.layers.3.mlp.gate_proj",
+        "K": 2,
+        "shape": [
+          5120,
+          17408
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002942382707260549,
+        "linear_max_abs": 0.0013670921325683594,
+        "seconds": 7.1
+      },
+      {
+        "projection": "model.language_model.layers.3.mlp.up_proj",
+        "K": 2,
+        "shape": [
+          5120,
+          17408
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00029143219580873847,
+        "linear_max_abs": 0.0012288093566894531,
+        "seconds": 18.2
+      },
+      {
+        "projection": "model.language_model.layers.3.mlp.down_proj",
+        "K": 3,
+        "shape": [
+          17408,
+          5120
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00029593557701446116,
+        "linear_max_abs": 0.002887248992919922,
+        "seconds": 7.0
+      },
+      {
+        "projection": "model.language_model.layers.34.linear_attn.in_proj_qkv",
+        "K": 2,
+        "shape": [
+          5120,
+          10240
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002942645223811269,
+        "linear_max_abs": 0.0022487640380859375,
+        "seconds": 5.1
+      },
+      {
+        "projection": "model.language_model.layers.34.linear_attn.in_proj_z",
+        "K": 2,
+        "shape": [
+          5120,
+          6144
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002940471167676151,
+        "linear_max_abs": 0.0015826225280761719,
+        "seconds": 3.0
+      },
+      {
+        "projection": "model.language_model.layers.34.linear_attn.out_proj",
+        "K": 3,
+        "shape": [
+          6144,
+          5120
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002944776206277311,
+        "linear_max_abs": 0.0023832321166992188,
+        "seconds": 2.3
+      },
+      {
+        "projection": "model.language_model.layers.34.mlp.gate_proj",
+        "K": 2,
+        "shape": [
+          5120,
+          17408
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00028985575772821903,
+        "linear_max_abs": 0.0013275146484375,
+        "seconds": 6.1
+      },
+      {
+        "projection": "model.language_model.layers.34.mlp.up_proj",
+        "K": 3,
+        "shape": [
+          5120,
+          17408
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002932049101218581,
+        "linear_max_abs": 0.0014743804931640625,
+        "seconds": 6.5
+      },
+      {
+        "projection": "model.language_model.layers.34.mlp.down_proj",
+        "K": 3,
+        "shape": [
+          17408,
+          5120
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002950757334474474,
+        "linear_max_abs": 0.002705097198486328,
+        "seconds": 6.4
+      },
+      {
+        "projection": "model.language_model.layers.63.self_attn.q_proj",
+        "K": 2,
+        "shape": [
+          5120,
+          12288
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002910556795541197,
+        "linear_max_abs": 0.002048015594482422,
+        "seconds": 4.3
+      },
+      {
+        "projection": "model.language_model.layers.63.self_attn.k_proj",
+        "K": 3,
+        "shape": [
+          5120,
+          1024
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002952349022962153,
+        "linear_max_abs": 0.0015761852264404297,
+        "seconds": 0.4
+      },
+      {
+        "projection": "model.language_model.layers.63.self_attn.v_proj",
+        "K": 3,
+        "shape": [
+          5120,
+          1024
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00029139750404283404,
+        "linear_max_abs": 0.002578258514404297,
+        "seconds": 0.4
+      },
+      {
+        "projection": "model.language_model.layers.63.self_attn.o_proj",
+        "K": 2,
+        "shape": [
+          6144,
+          5120
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002955745439976454,
+        "linear_max_abs": 0.0021805763244628906,
+        "seconds": 2.1
+      },
+      {
+        "projection": "model.language_model.layers.63.mlp.gate_proj",
+        "K": 3,
+        "shape": [
+          5120,
+          17408
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.0002937412937171757,
+        "linear_max_abs": 0.0019421577453613281,
+        "seconds": 6.4
+      },
+      {
+        "projection": "model.language_model.layers.63.mlp.up_proj",
+        "K": 3,
+        "shape": [
+          5120,
+          17408
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00029224189347587526,
+        "linear_max_abs": 0.002861499786376953,
+        "seconds": 6.5
+      },
+      {
+        "projection": "model.language_model.layers.63.mlp.down_proj",
+        "K": 3,
+        "shape": [
+          17408,
+          5120
+        ],
+        "weights_exact": true,
+        "weights_bits_diff": 0,
+        "linear_rel_l2": 0.00029113516211509705,
+        "linear_max_abs": 0.0030488967895507812,
+        "seconds": 6.4
+      }
+    ],
+    "n": 26,
+    "G2a_pass": true,
+    "G2b_pass": true,
+    "G2b_max_rel_l2": 0.0002989479689858854,
+    "G2b_tolerance": 0.001
+  },
+  "finished": "2026-11-20 19:24:36"
+}

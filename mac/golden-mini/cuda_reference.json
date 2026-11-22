@@ -1,0 +1,229 @@
+{
+ "engine": "escha-engine (llama.cpp fork)",
+ "model": "Qwen3.8-27B-V3ac-h32-q8head-mtpq4.gguf",
+ "kv": "q8_0",
+ "batch": 256,
+ "created": "2026-11-20T07:11:14Z",
+ "note": "per-document results of the CUDA engine (RTX 4070) on the same documents; the same tensor data as Kintsugi-27B-12G.gguf",
+ "gen_rows": 18158,
+ "kld_mean": 0.07785317455501707,
+ "top1_agreement": 0.8900209274149136,
+ "per_doc": [
+  {
+   "public_doc": 4,
+   "source": "fineweb2-hq/spa_Latn",
+   "gen_rows": 389,
+   "kl_sum": 35.8147494,
+   "top1": 329,
+   "nll_q": 1072.43956,
+   "nll_p": 1028.19663
+  },
+  {
+   "public_doc": 6,
+   "source": "stackv2-edu",
+   "gen_rows": 790,
+   "kl_sum": 17.9736632,
+   "top1": 741,
+   "nll_q": 825.705637,
+   "nll_p": 818.494924
+  },
+  {
+   "public_doc": 10,
+   "source": "fineweb2-hq/tur_Latn",
+   "gen_rows": 1174,
+   "kl_sum": 212.104741,
+   "top1": 968,
+   "nll_q": 2182.55866,
+   "nll_p": 2042.35902
+  },
+  {
+   "public_doc": 18,
+   "source": "fineweb-edu",
+   "gen_rows": 1284,
+   "kl_sum": 45.5120751,
+   "top1": 1190,
+   "nll_q": 2350.77736,
+   "nll_p": 2310.19615
+  },
+  {
+   "public_doc": 24,
+   "source": "glaive-fc-v2",
+   "gen_rows": 127,
+   "kl_sum": 2.3176578,
+   "top1": 125,
+   "nll_q": 30.7560928,
+   "nll_p": 43.016744
+  },
+  {
+   "public_doc": 28,
+   "source": "wildchat",
+   "gen_rows": 543,
+   "kl_sum": 34.9246816,
+   "top1": 508,
+   "nll_q": 403.913738,
+   "nll_p": 411.582102
+  },
+  {
+   "public_doc": 34,
+   "source": "finemath-4plus",
+   "gen_rows": 498,
+   "kl_sum": 58.4792442,
+   "top1": 433,
+   "nll_q": 918.834034,
+   "nll_p": 879.072742
+  },
+  {
+   "public_doc": 38,
+   "source": "fineweb2-hq/cmn_Hani",
+   "gen_rows": 376,
+   "kl_sum": 27.111008,
+   "top1": 314,
+   "nll_q": 977.983703,
+   "nll_p": 961.878043
+  },
+  {
+   "public_doc": 40,
+   "source": "stackexchange",
+   "gen_rows": 636,
+   "kl_sum": 35.0103054,
+   "top1": 524,
+   "nll_q": 1621.92179,
+   "nll_p": 1611.48476
+  },
+  {
+   "public_doc": 44,
+   "source": "libretexts",
+   "gen_rows": 1751,
+   "kl_sum": 100.911454,
+   "top1": 1611,
+   "nll_q": 1708.98999,
+   "nll_p": 1637.04025
+  },
+  {
+   "public_doc": 46,
+   "source": "smoltalk2/systemchats",
+   "gen_rows": 269,
+   "kl_sum": 22.1356468,
+   "top1": 236,
+   "nll_q": 352.597733,
+   "nll_p": 340.051674
+  },
+  {
+   "public_doc": 72,
+   "source": "wikimedia",
+   "gen_rows": 362,
+   "kl_sum": 35.9991903,
+   "top1": 324,
+   "nll_q": 519.657962,
+   "nll_p": 487.38747
+  },
+  {
+   "public_doc": 96,
+   "source": "fineweb2-hq/ces_Latn",
+   "gen_rows": 853,
+   "kl_sum": 87.3650356,
+   "top1": 742,
+   "nll_q": 1638.6731,
+   "nll_p": 1585.38478
+  },
+  {
+   "public_doc": 108,
+   "source": "fineweb2-hq/rus_Cyrl",
+   "gen_rows": 399,
+   "kl_sum": 37.4966857,
+   "top1": 347,
+   "nll_q": 615.196984,
+   "nll_p": 576.471203
+  },
+  {
+   "public_doc": 116,
+   "source": "when2call",
+   "gen_rows": 38,
+   "kl_sum": 1.84031933,
+   "top1": 35,
+   "nll_q": 44.8067979,
+   "nll_p": 46.1022913
+  },
+  {
+   "public_doc": 144,
+   "source": "fineweb2-hq/arb_Arab",
+   "gen_rows": 355,
+   "kl_sum": 28.3751432,
+   "top1": 312,
+   "nll_q": 665.881145,
+   "nll_p": 641.355983
+  },
+  {
+   "public_doc": 146,
+   "source": "smoltalk2/everyday",
+   "gen_rows": 1501,
+   "kl_sum": 113.156198,
+   "top1": 1361,
+   "nll_q": 1125.77357,
+   "nll_p": 1080.39585
+  },
+  {
+   "public_doc": 160,
+   "source": "hermes-fc",
+   "gen_rows": 139,
+   "kl_sum": 3.61735924,
+   "top1": 135,
+   "nll_q": 36.4052442,
+   "nll_p": 42.1381004
+  },
+  {
+   "public_doc": 166,
+   "source": "the-stack-smol-xl",
+   "gen_rows": 1697,
+   "kl_sum": 35.5522846,
+   "top1": 1629,
+   "nll_q": 1224.48076,
+   "nll_p": 1204.94657
+  },
+  {
+   "public_doc": 176,
+   "source": "fineweb2-hq/ind_Latn",
+   "gen_rows": 525,
+   "kl_sum": 56.9215326,
+   "top1": 439,
+   "nll_q": 1149.64216,
+   "nll_p": 1111.40917
+  },
+  {
+   "public_doc": 192,
+   "source": "fineweb2-hq/ell_Grek",
+   "gen_rows": 612,
+   "kl_sum": 57.9777651,
+   "top1": 513,
+   "nll_q": 1426.5147,
+   "nll_p": 1387.66404
+  },
+  {
+   "public_doc": 238,
+   "source": "wikipedia/he",
+   "gen_rows": 1539,
+   "kl_sum": 183.980654,
+   "top1": 1338,
+   "nll_q": 2231.25225,
+   "nll_p": 2165.52758
+  },
+  {
+   "public_doc": 246,
+   "source": "fineweb2-hq/dan_Latn",
+   "gen_rows": 1186,
+   "kl_sum": 105.587697,
+   "top1": 1031,
+   "nll_q": 2567.9847,
+   "nll_p": 2483.97193
+  },
+  {
+   "public_doc": 248,
+   "source": "doab",
+   "gen_rows": 1115,
+   "kl_sum": 73.4928524,
+   "top1": 976,
+   "nll_q": 2750.61171,
+   "nll_p": 2705.87804
+  }
+ ]
+}
