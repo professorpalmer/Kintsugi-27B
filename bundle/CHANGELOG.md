@@ -5,6 +5,20 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.1.3 (2026-11-22)
+
+- **Launcher only: DFlash2 falls back to MTP once.** When the launcher picks the DFlash2 drafter by itself (the drafter
+  file is in `models`, `KINTSUGI_DRAFT=auto`) and the server stops during the load or the warm-up request fails with
+  it, the launcher keeps that log as `logs/server-<port>.dflash-failed.log`, prints its error lines, and starts once more
+  with MTP + lookup drafting. `KINTSUGI_DRAFT=dflash` still stops with the error. A user reported a DFlash2 warm-up
+  failure on an RTX 3080 Ti 12 GB with Windows; on a rented RTX 3080 Ti with Linux we could not make it fail (VRAM peak
+  10,988 MiB of 11,901 at our test settings), so please send us the kept log if you see the fallback note.
+- The launcher no longer says "ready" when the server stopped during the warm-up request.
+- Checks: the Windows launcher prints the same settings and server command as v1.1.2 in every drafting mode; five start
+  cases (DFlash2, a broken drafter, a refused warm-up, a forced broken DFlash2, MTP) pass on an RTX 4070 with Windows
+  and on an RTX 3080 Ti with Linux, with no server or layer left running after each. The engine and the model file do
+  not change: download only the new zip or tarball.
+
 ## v1.1.2 (2026-11-22)
 
 - **Optional images.** Download Qwen's vision projector (`mmproj-Qwen3.8-27B-Q8_0.gguf`, 629 MB, from ggml-org's

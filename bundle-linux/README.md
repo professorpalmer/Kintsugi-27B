@@ -1,4 +1,4 @@
-# Kintsugi-27B v1.1.2 for Linux (x86_64, RTX 20 / 30 / 40 / 50 and H100, 12 GB)
+# Kintsugi-27B v1.1.3 for Linux (x86_64, RTX 20 / 30 / 40 / 50 and H100, 12 GB)
 
 These are the text files of the Linux tarball; download the tarball from
 [Releases](https://github.com/professorpalmer/Kintsugi-27B/releases/latest). The tarball also holds the engine
@@ -26,10 +26,10 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
 
 ## Download and start
 
-1. Download `Kintsugi-27B-v1.1.2-linux-x86_64.tar.gz` from the Releases page and unpack it:
+1. Download `Kintsugi-27B-v1.1.3-linux-x86_64.tar.gz` from the Releases page and unpack it:
 
    ```
-   tar -xzf Kintsugi-27B-v1.1.2-linux-x86_64.tar.gz
+   tar -xzf Kintsugi-27B-v1.1.3-linux-x86_64.tar.gz
    cd Kintsugi-27B
    ```
 
