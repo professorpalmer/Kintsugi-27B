@@ -55,7 +55,7 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 
 You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](bundle/README.md).
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.1.2-linux-x86_64.tar.gz` from the same Releases page, then
+**Linux (x86_64):** download `Kintsugi-27B-v1.1.3-linux-x86_64.tar.gz` from the same Releases page, then
 `tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
 glibc 2.34+ (Ubuntu 22.04 and 24.04); no other libraries. Full guide: [bundle-linux/README.md](bundle-linux/README.md).
 

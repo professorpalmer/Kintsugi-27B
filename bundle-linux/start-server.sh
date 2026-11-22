@@ -47,6 +47,7 @@ pick() {   # pick NAME DEFAULT: KINTSUGI_NAME, else ESCHA_NAME, else DEFAULT
   if [ -n "${!a:-}" ]; then echo "${!a}"; elif [ -n "${!b:-}" ]; then echo "${!b}"; else echo "$2"; fi
 }
 PORT=8080; WAIT=0; DRY=0
+ORIG_ARGS=("$@")   # for the one DFlash2 -> MTP retry (retry_mtp below)
 while [ $# -gt 0 ]; do
   case "$1" in
     --port) PORT="$2"; shift 2 ;;
@@ -238,6 +239,7 @@ fi
 
 # ---- Engine switches -------------------------------------------------------------------------------------------------
 export GGML_CUDA_BATCH_INVARIANT=1
+SET_DFLASH_UB=0; [ "$MODE" = dflash ] && [ -z "${LLAMA_DFLASH_DRAFT_UBATCH:-}" ] && SET_DFLASH_UB=1
 [ "$MODE" = dflash ] && export LLAMA_DFLASH_DRAFT_UBATCH="${LLAMA_DFLASH_DRAFT_UBATCH:-64}"
 if [ "$DRAFT" -gt 0 ]; then export LLAMA_RS_REPLAY=1 GGML_CUDA_SHARED_POOL=1; export LLAMA_MTP_DRAFT_UBATCH="${LLAMA_MTP_DRAFT_UBATCH:-256}"; fi
 export LLAMA_ARG_CHECKPOINT_EVERY_NT=8192
@@ -331,6 +333,27 @@ if [ $USE_LAYER = 1 ]; then
 fi
 echo "stop   $ROOT/stop.sh"
 alive() { kill -0 "$1" 2> /dev/null; }
+# DFlash2 -> MTP, once: when DFlash2 was chosen automatically (KINTSUGI_DRAFT=auto) and the server stops during the load
+# or the warm-up request fails, keep that log, stop the server (and the layer) and start again with MTP + lookup
+# drafting. KINTSUGI_DRAFT=dflash fails instead. Only with --wait (the warm-up needs it).
+retry_mtp() {   # retry_mtp <why>: returns only when no retry applies
+  [ "$MODE" = dflash ] && [ "$DRAFT_SET" = auto ] && [ -z "${KINTSUGI_DFLASH_RETRIED:-}" ] || return 0
+  local fail="${LOG%.log}.dflash-failed.log" x i u
+  cp -f "$LOG" "$fail" 2> /dev/null
+  echo "note   DFlash2 start failed ($1): starting again once with MTP + lookup drafting (KINTSUGI_DRAFT=mtp skips DFlash2)."
+  echo "       Please report it with your card, driver and the log $fail at https://github.com/professorpalmer/Kintsugi-27B/issues"
+  grep -a -i -E "out of memory|cudaMalloc|failed to allocate|CUDA error|error|failed|abort" "$LOG" 2> /dev/null | tail -6 | cut -c1-240 | sed "s/^/  log  /"
+  for x in ${LP:-} $SP; do alive "$x" && kill "$x" 2> /dev/null; done
+  for i in $(seq 1 30); do alive "$SP" || { [ -n "${LP:-}" ] && alive "$LP"; } || break; sleep 1; done
+  for x in ${LP:-} $SP; do alive "$x" && kill -9 "$x" 2> /dev/null; done
+  # the driver frees the memory of a stopped process a moment later; the cell count of the retry reads the free VRAM
+  for i in $(seq 1 20); do
+    u=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -1 | tr -dc '0-9')
+    [ -n "$u" ] && [ "$u" -le $((USED + 64)) ] && break; sleep 1
+  done
+  [ "$SET_DFLASH_UB" = 1 ] && unset LLAMA_DFLASH_DRAFT_UBATCH
+  exec env KINTSUGI_DRAFT=mtp KINTSUGI_DFLASH_RETRIED=1 bash "$ROOT/start-server.sh" ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
+}
 if [ $WAIT = 0 ]; then
   # No wait for the load: the engine writes its GPU set-up to the log before the model load starts.
   for i in $(seq 1 60); do
@@ -349,8 +372,14 @@ for i in $(seq 1 150); do
     TEXT="$(for n in $(seq 1 110); do printf 'Entry %d of the log has nothing to report. ' "$n"; done)"
     BODY="{\"model\":\"warmup\",\"max_tokens\":8,\"temperature\":0,\"cache_prompt\":false,\"chat_template_kwargs\":{\"enable_thinking\":false},\"messages\":[{\"role\":\"user\",\"content\":\"${TEXT}Say OK.\"}]}"
     T0=$(date +%s.%N)
-    curl -sf -m 600 ${AUTH[@]+"${AUTH[@]}"} -H 'Content-Type: application/json' -d "$BODY" "http://127.0.0.1:$PORT/v1/chat/completions" > /dev/null \
-      || echo "note   the warm-up request failed"
+    WARM_OK=1
+    curl -sf -m 600 ${AUTH[@]+"${AUTH[@]}"} -H 'Content-Type: application/json' -d "$BODY" "http://127.0.0.1:$PORT/v1/chat/completions" > /dev/null || WARM_OK=0
+    sleep 0.5
+    if [ $WARM_OK = 0 ] || ! alive "$SP"; then
+      if alive "$SP"; then retry_mtp "the warm-up request failed"; else retry_mtp "the server stopped during the warm-up request"; fi
+      echo "note   the warm-up request failed"
+      alive "$SP" || { echo "server stopped after the warm-up request: see $LOG"; exit 1; }
+    fi
     T1=$(date +%s.%N)
     VRAM=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -1 | tr -dc '0-9')
     PROC=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits 2> /dev/null | awk -F', *' -v p="$SP" '$1 == p { print $2 }')
@@ -365,6 +394,7 @@ for i in $(seq 1 150); do
   fi
   if ! alive "$SP"; then
     M="$(no_gpu_message "$LOG")"; [ -n "$M" ] && stop_no_gpu "$M"
+    retry_mtp "the server stopped during the load"
     echo "server stopped during load: see $LOG"; exit 1
   fi
   if [ -n "$LP" ] && ! alive "$LP"; then echo "layer stopped: see $LAYER_LOG"; exit 1; fi
