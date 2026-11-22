@@ -34,6 +34,8 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 
 ![Kintsugi-27B highlights](benchmarks/kintsugi-27b-highlights.png)
 
+![Rules hold to 237k tokens: no decay, level with full precision](benchmarks/persistence-at-depth.png)
+
 ## Quick start (Windows)
 
 1. Download the zip from [Releases (latest)](https://github.com/professorpalmer/Kintsugi-27B/releases/latest) and

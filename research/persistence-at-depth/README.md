@@ -1,5 +1,7 @@
 # Persistence at depth: do standing rules survive a long agent session?
 
+![Rules hold to 237k tokens: no decay, level with full precision](../../benchmarks/persistence-at-depth.png)
+
 **Status:** finished (2026-11-22). **Finding:** in a test of the first response after up to 237,229 tokens of the
 model's own agent trace, Kintsugi-27B as shipped kept all five standing rules of its system prompt, with no decay
 with depth. It was not worse than full-precision Qwen3.8-27B BF16 on any rule at any depth. The test can only show
