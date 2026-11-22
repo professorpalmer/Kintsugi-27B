@@ -18,6 +18,9 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 - **Gated on tasks, not only on KL**: every candidate bit map had to pass long-context recall, long-answer and agent
   tests. Our maps with lower KL failed them and did not ship ([the study](research/bit-allocation/README.md)).
 - **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
+- **Rules hold deep into agent sessions**: after up to 237k tokens of its own agent trace, Kintsugi-27B kept all five
+  standing system-prompt rules with no decay, and was not worse than Qwen3.8-27B BF16 on any rule or depth
+  ([research/persistence-at-depth](research/persistence-at-depth/README.md); the test sees only large gaps).
 - **Runs on RTX 20, 30 and 40 cards** with 12 GB or more, and **on Apple Silicon Macs** ([mac/](mac/README.md): chat
   and an OpenAI-compatible server; tested on an M5 Max). **Coming soon:** RTX 50 (Blackwell) and H100 (Hopper). AMD (ROCm / HIP) support is in progress. Intel GPUs are not supported yet. Stock
   llama.cpp, Ollama and LM Studio cannot load this file.
@@ -28,6 +31,8 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
   ([details](benchmarks/README.md#head-to-head-inkling-2-mini-on-the-same-12-gb-card)).
 
 ![Kintsugi-27B](kintsugi-card.png)
+
+![Kintsugi-27B highlights](benchmarks/kintsugi-27b-highlights.png)
 
 ## Quick start (Windows)
 

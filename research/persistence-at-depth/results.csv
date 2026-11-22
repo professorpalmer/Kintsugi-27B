@@ -1,0 +1,51 @@
+arm,target_depth,prefix_tokens,rule,kind,pass,scored,not_applicable,compliance,wilson95_low,wilson95_high
+Kintsugi-27B v1.1 (as shipped),0,721,R1,shown in the trace,20,20,0,1.000,0.84,1.00
+Kintsugi-27B v1.1 (as shipped),32000,29129,R1,shown in the trace,15,15,0,1.000,0.80,1.00
+Kintsugi-27B v1.1 (as shipped),117000,116976,R1,shown in the trace,15,15,0,1.000,0.80,1.00
+Kintsugi-27B v1.1 (as shipped),200000,194770,R1,shown in the trace,17,17,0,1.000,0.82,1.00
+Kintsugi-27B v1.1 (as shipped),245000,237229,R1,shown in the trace,14,14,0,1.000,0.78,1.00
+Kintsugi-27B v1.1 (as shipped),0,721,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Kintsugi-27B v1.1 (as shipped),32000,29129,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Kintsugi-27B v1.1 (as shipped),117000,116976,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Kintsugi-27B v1.1 (as shipped),200000,194770,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Kintsugi-27B v1.1 (as shipped),245000,237229,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Kintsugi-27B v1.1 (as shipped),0,721,R2,system prompt only,10,12,0,0.833,0.55,0.95
+Kintsugi-27B v1.1 (as shipped),32000,29129,R2,system prompt only,11,12,0,0.917,0.65,0.99
+Kintsugi-27B v1.1 (as shipped),117000,116976,R2,system prompt only,12,12,0,1.000,0.76,1.00
+Kintsugi-27B v1.1 (as shipped),200000,194770,R2,system prompt only,11,12,0,0.917,0.65,0.99
+Kintsugi-27B v1.1 (as shipped),245000,237229,R2,system prompt only,12,12,0,1.000,0.76,1.00
+Kintsugi-27B v1.1 (as shipped),0,721,R4,system prompt only,7,7,5,1.000,0.65,1.00
+Kintsugi-27B v1.1 (as shipped),32000,29129,R4,system prompt only,11,11,1,1.000,0.74,1.00
+Kintsugi-27B v1.1 (as shipped),117000,116976,R4,system prompt only,9,9,3,1.000,0.70,1.00
+Kintsugi-27B v1.1 (as shipped),200000,194770,R4,system prompt only,10,10,2,1.000,0.72,1.00
+Kintsugi-27B v1.1 (as shipped),245000,237229,R4,system prompt only,7,7,5,1.000,0.65,1.00
+Kintsugi-27B v1.1 (as shipped),0,721,R5,system prompt only,11,12,0,0.917,0.65,0.99
+Kintsugi-27B v1.1 (as shipped),32000,29129,R5,system prompt only,12,12,0,1.000,0.76,1.00
+Kintsugi-27B v1.1 (as shipped),117000,116976,R5,system prompt only,12,12,0,1.000,0.76,1.00
+Kintsugi-27B v1.1 (as shipped),200000,194770,R5,system prompt only,12,12,0,1.000,0.76,1.00
+Kintsugi-27B v1.1 (as shipped),245000,237229,R5,system prompt only,12,12,0,1.000,0.76,1.00
+Qwen3.8-27B BF16,0,721,R1,shown in the trace,19,19,0,1.000,0.83,1.00
+Qwen3.8-27B BF16,32000,29129,R1,shown in the trace,15,15,0,1.000,0.80,1.00
+Qwen3.8-27B BF16,117000,116976,R1,shown in the trace,16,16,0,1.000,0.81,1.00
+Qwen3.8-27B BF16,200000,194770,R1,shown in the trace,15,15,0,1.000,0.80,1.00
+Qwen3.8-27B BF16,245000,237229,R1,shown in the trace,16,16,0,1.000,0.81,1.00
+Qwen3.8-27B BF16,0,721,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Qwen3.8-27B BF16,32000,29129,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Qwen3.8-27B BF16,117000,116976,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Qwen3.8-27B BF16,200000,194770,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Qwen3.8-27B BF16,245000,237229,R3,shown in the trace,24,24,0,1.000,0.86,1.00
+Qwen3.8-27B BF16,0,721,R2,system prompt only,12,12,0,1.000,0.76,1.00
+Qwen3.8-27B BF16,32000,29129,R2,system prompt only,12,12,0,1.000,0.76,1.00
+Qwen3.8-27B BF16,117000,116976,R2,system prompt only,12,12,0,1.000,0.76,1.00
+Qwen3.8-27B BF16,200000,194770,R2,system prompt only,12,12,0,1.000,0.76,1.00
+Qwen3.8-27B BF16,245000,237229,R2,system prompt only,11,12,0,0.917,0.65,0.99
+Qwen3.8-27B BF16,0,721,R4,system prompt only,6,6,6,1.000,0.61,1.00
+Qwen3.8-27B BF16,32000,29129,R4,system prompt only,11,11,1,1.000,0.74,1.00
+Qwen3.8-27B BF16,117000,116976,R4,system prompt only,11,11,1,1.000,0.74,1.00
+Qwen3.8-27B BF16,200000,194770,R4,system prompt only,10,10,2,1.000,0.72,1.00
+Qwen3.8-27B BF16,245000,237229,R4,system prompt only,9,9,3,1.000,0.70,1.00
+Qwen3.8-27B BF16,0,721,R5,system prompt only,11,12,0,0.917,0.65,0.99
+Qwen3.8-27B BF16,32000,29129,R5,system prompt only,12,12,0,1.000,0.76,1.00
+Qwen3.8-27B BF16,117000,116976,R5,system prompt only,12,12,0,1.000,0.76,1.00
+Qwen3.8-27B BF16,200000,194770,R5,system prompt only,12,12,0,1.000,0.76,1.00
+Qwen3.8-27B BF16,245000,237229,R5,system prompt only,12,12,0,1.000,0.76,1.00

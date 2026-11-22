@@ -12,6 +12,7 @@ pass line before the run that it judges.
 | [long-context-decode/](long-context-decode/README.md) | finished | Past about 144k tokens, the PCIe stream of the cold K/V cells sets the decode speed; a sparse V read, two copy-pipeline designs, a 3-bit K cache and a 2-bit head stage did not pass their gates, and an fp32 attention sum fixed a real kernel error but did not change recall or the true-token NLL. |
 | [cross-architecture/](cross-architecture/README.md) | finished | On Turing and Ampere the engine computes the same model as on Ada (KL +0.02 % and +0.92 %, retrieval 24/24 + 20/20 at 117k); identity differs by rounding only. |
 | [clean-rebuild/](clean-rebuild/README.md) | finished, shipped in v1 | The release file is built from our fits and Qwen's BF16 release only (+0.0 % KL against the old build), and a per-32 Q8_0 head gives -0.1 % KL for free. |
+| [persistence-at-depth/](persistence-at-depth/README.md) | finished | After up to 237k tokens of its own agent trace, the model kept all five standing rules with no decay, and the 2.47-bit model was not worse than BF16 on any rule (only gaps of 30-40 points can show with 12-24 responses per cell). |
 
 Common terms (each study defines its own once):
 
