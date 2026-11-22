@@ -1,4 +1,4 @@
-# Kintsugi-27B on one 12 GB NVIDIA card (RTX 20 / 30 / 40): 262,144-token window, tiered K/V cache, MTP + lookup drafting.
+# Kintsugi-27B on one 12 GB NVIDIA card (RTX 20 / 30 / 40 / 50, H100): 262,144-token window, tiered K/V cache, MTP + lookup drafting.
 #
 #   powershell -ExecutionPolicy Bypass -File start-server.ps1 [-Port 8080] [-Wait] [-DryRun]
 #
@@ -17,6 +17,11 @@
 #   KINTSUGI_DRAFT         auto (default: DFlash2 draft 7 when the drafter file is there, else MTP 3 + lookup) | dflash |
 #                          mtp | off; a number = the MTP draft size (0 = no drafting)
 #   KINTSUGI_DRAFTER       DFlash2 drafter file (default models\dflash-Qwen3.8-27B-Q4_0.gguf; an optional download)
+#   KINTSUGI_VISION        auto (default: images on when the projector file is there; the projector on the CPU on a card
+#                          under 16 GB, on the GPU from 16 GB) | gpu | cpu | off. cpu: no VRAM cost, an image reads in
+#                          5-25 s; gpu: ~1.3 GB of VRAM (fewer K/V cells in VRAM), an image reads in 1-3 s
+#   KINTSUGI_MMPROJ        vision projector file (default models\mmproj-Qwen3.8-27B-Q8_0.gguf; an optional download)
+#   KINTSUGI_IMAGE_MAX_TOKENS  tokens for one image at most (default 2048; a larger image is scaled down to fit)
 #   KINTSUGI_THINK         medium (default) | off
 #   KINTSUGI_READ          fast (default: int8 read of long prompts) | exact
 #   KINTSUGI_HEAD2         two-stage output head: exact candidates for each row (default 512; 0 = off)
@@ -96,13 +101,39 @@ if ($Driver -match '^(\d+)\.') {
     Write-Host "WARN   could not read the NVIDIA driver version from nvidia-smi: the driver check is skipped"
 }
 
+# ---- Card generation: bin\ has native code for compute capability 7.5 / 8.6 / 8.9 (RTX 20 / 30 / 40), 9.0 (H100 / H200)
+# and 12.0 (RTX 50), and portable code (compute_90 PTX) that newer cards compile at the first start. CUDA loads only the
+# code of your card, so the code for the other cards costs no VRAM or speed. KINTSUGI_TEST_CC=<x.y> replaces the value
+# that nvidia-smi gives (tests).
+$Cc = Pick 'TEST_CC' ''
+if (-not $Cc) {
+    try { $Cc = "$((& nvidia-smi --query-gpu=compute_cap --format=csv,noheader -i 0 2>$null) | Select-Object -First 1)".Trim() } catch { $Cc = '' }
+}
+if ($Cc -match '^(\d+)\.(\d+)$') {
+    $CcMajor = [int]$Matches[1]; $CcMinor = [int]$Matches[2]; $CcN = 10 * $CcMajor + $CcMinor
+    $Supported = 'RTX 20 / 30 / 40 / 50 cards with 12 GB or more, and H100 / H200'
+    if ($CcN -lt 75) {
+        Write-Host "This NVIDIA card (compute capability $Cc) is older than RTX 20 (Turing, 7.5): Kintsugi-27B has no code for it. Supported: $Supported."
+        exit 1
+    } elseif (($CcMajor -eq 7 -and $CcN -ne 75) -or ($CcMajor -eq 8 -and $CcMinor -lt 6)) {
+        Write-Host "This NVIDIA card (compute capability $Cc, for example a V100 / A100 / A30) has no code in this bundle. Supported: $Supported."
+        exit 1
+    } elseif ($CcN -ge 90 -and $CcN -ne 90 -and $CcN -ne 120) {
+        Write-Host "note   this card (compute capability $Cc) runs the engine's portable code: the driver compiles it at the first start (several minutes, once, then cached). We have not tested this card."
+        # the driver's compile cache must hold all of it, or every start compiles again: 4 GiB (the largest value)
+        if (-not $env:CUDA_CACHE_MAXSIZE) { $env:CUDA_CACHE_MAXSIZE = '4294967296' }
+    }
+} else {
+    Write-Host "WARN   could not read the card's compute capability from nvidia-smi: the card check is skipped"
+}
+
 # ---- VRAM line: how many K/V cells fit in VRAM; the rest of the window lives in system RAM -----------------------------
 $HalfBytes = @{ 'q8_0' = 17408; 'q4_0' = 9216; 'q3_0' = 7168 }   # bytes of K (or of V) per cell, all attention layers
 if (-not $HalfBytes.ContainsKey($Kv)) { throw "KINTSUGI_KV must be one of: $($HalfBytes.Keys -join ', ')" }
 $Cell = 2 * $HalfBytes[$Kv]
 $q = (& nvidia-smi --query-gpu=memory.total,memory.used,display_active --format=csv,noheader,nounits | Select-Object -First 1).Split(',')
 $TotalMiB = [int]$q[0]; $UsedMiB = [int]$q[1]; $Headless = $q[2].Trim() -ne 'Enabled'
-if ($TotalMiB -lt 11500) { Write-Host "note   this card has $TotalMiB MiB; Kintsugi-27B is made for 12 GB cards and may not load" }
+if ($TotalMiB -lt 11500) { Write-Host "WARN   this card has $TotalMiB MiB of VRAM. Kintsugi-27B needs a 12 GB card (the model alone takes about 9.5 GB): it may not load, or most of the context will be in system RAM and slow." }
 # Margin under the card's limit, on top of the measured growth (a display on the card moves by itself, so more margin).
 $Margin = [int](Pick 'MARGIN' $(if ($Headless) { 250 } else { 600 }))
 $MarginWhy = if (Pick 'MARGIN' '') { 'KINTSUGI_MARGIN' } elseif ($Headless) { 'no display on this card' } else { 'display on this card: nvidia-smi display_active; KINTSUGI_MARGIN=250 if that is wrong' }
@@ -135,11 +166,36 @@ $Head2MiB = if ($Head2 -gt 0) { 606 } else { 0 }
 # With DFlash2 (draft micro-batch 64): 10,238 MiB at load for the 1,094,346,080-byte drafter (rig, 2026-11-19); another
 # drafter file moves it by the difference.
 $DrafterMiB = if ($Mode -eq 'dflash') { 765 + [int][math]::Round(((FileLength $Drafter) - 1094346080) / 1MB) } else { 0 }
-$Fixed = 9473 + $HeadMiB - $Head2MiB + $DrafterMiB
+# ---- Vision: the Qwen3.8 projector (mmproj) reads images; an optional download -------------------------------------
+# auto: on a card under 16 GB the projector runs on the CPU (it keeps every K/V cell in VRAM; on a 12 GB card the GPU
+# projector would leave about 61,000 of 144,000), on 16 GB or more on the GPU (faster image reads).
+# On the GPU it takes VRAM for its weights and for the work of one image at the cap (measured on an RTX 4070,
+# docs: KINTSUGI-VISION V3), so fewer K/V cells fit in VRAM; the window stays the same. On the CPU (KINTSUGI_VISION=cpu)
+# it takes almost no VRAM and reads an image more slowly.
+$Mmproj = Pick 'MMPROJ' (Join-Path $Root 'models\mmproj-Qwen3.8-27B-Q8_0.gguf')
+$VisSet = (Pick 'VISION' 'auto').ToLower()
+switch ($VisSet) {
+    'auto' { $Vision = if (-not (Test-Path $Mmproj)) { 'off' } elseif ($TotalMiB -ge 15500) { 'gpu' } else { 'cpu' } }
+    'gpu'  { if (-not (Test-Path $Mmproj)) { throw "vision projector not found: $Mmproj (set KINTSUGI_MMPROJ, or KINTSUGI_VISION=auto)" }; $Vision = 'gpu' }
+    'cpu'  { if (-not (Test-Path $Mmproj)) { throw "vision projector not found: $Mmproj (set KINTSUGI_MMPROJ, or KINTSUGI_VISION=auto)" }; $Vision = 'cpu' }
+    'off'  { $Vision = 'off' }
+    default { throw "KINTSUGI_VISION must be auto, gpu, cpu or off" }
+}
+# DFlash2 does not work with images yet (an image late in a long conversation fails in the drafter, KINTSUGI-VISION T3):
+# with vision on, drafting is MTP + lookup.
+if ($Vision -ne 'off' -and $Mode -eq 'dflash') {
+    if ($DraftSet -eq 'dflash') { throw "KINTSUGI_DRAFT=dflash does not work with vision on: set KINTSUGI_VISION=off for DFlash2, or KINTSUGI_DRAFT=auto" }
+    $Mode = 'mtp'; $DrafterMiB = 0
+    $DraftNote = "note   vision on: MTP + lookup drafting (the DFlash2 drafter does not work with images yet; KINTSUGI_VISION=off uses it)"
+}
+$ImgMax = [int](Pick 'IMAGE_MAX_TOKENS' 2048)
+# Measured for the 629,247,008-byte Q8_0 projector at a 2048-token cap; another file moves it by the difference.
+$VisionMiB = if ($Vision -eq 'gpu') { 852 + [int][math]::Round(((FileLength $Mmproj) - 629247008) / 1MB) } elseif ($Vision -eq 'cpu') { 0 } else { 0 }
+$Fixed = 9473 + $HeadMiB - $Head2MiB + $DrafterMiB + $VisionMiB
 # The first request adds about 222 MiB once (cuBLAS, kernel code at first use); the warm-up request pays it at start.
 # Requests of many new lengths then add up to about 210 MiB (CUDA graphs); the margin covers that. With DFlash2, 128 MiB
 # more: Linux needs about 50 MiB more for it than Windows, and the rest keeps the peak 64 MiB or more under the limit.
-$Growth = 222 + $(if ($Mode -eq 'dflash') { 128 } else { 0 })
+$Growth = 222 + $(if ($Mode -eq 'dflash') { 128 } else { 0 }) + $(if ($Vision -eq 'gpu') { 512 } else { 0 })
 # The driver keeps part of the card for itself ("Reserved" in nvidia-smi -q; 272 MiB on an RTX 4070 with Windows, 416 MiB
 # on one with Linux). Past the rest, Windows moves memory to system RAM without an error and everything slows down (the
 # "spill" below). Ceiling = the smaller of 97.7 % of the card and the card less the reserved part less 8 MiB.
@@ -246,6 +302,10 @@ $SrvArgs = @('-m', ('"' + $Model + '"'), '-ngl', '99', '-c', "$Ctx", '-fa', 'on'
 if ($Template -ne 'model') { $SrvArgs += @('--chat-template-file', ('"' + $Template + '"')) }
 if ($KeyFile) { $SrvArgs += @('--api-key-file', ('"' + $KeyFile + '"')) }
 if ($SlotDir) { $SrvArgs += @('--slot-save-path', ('"' + $SlotDir + '"')) }
+if ($Vision -ne 'off') {
+    $SrvArgs += @('--mmproj', ('"' + $Mmproj + '"'), '--image-max-tokens', "$ImgMax")
+    if ($Vision -eq 'cpu') { $SrvArgs += '--no-mmproj-offload' }
+}
 $Extra = Pick 'EXTRA' ''
 if ($Extra) { $SrvArgs += $Extra.Split(' ') }
 
@@ -257,6 +317,7 @@ Write-Host "template $(if ($Template -eq 'model') { 'the model file''s own' } el
 if ($Head2 -gt 0) { Write-Host "head   two-stage: first stage q4_0 in VRAM, $Head2 exact candidates for each row from system RAM" }
 Write-Host "spec   $(if ($Mode -eq 'off') { 'off' } elseif ($Mode -eq 'dflash') { "DFlash2 draft 7 ($(Split-Path $Drafter -Leaf))" } else { "MTP draft $Draft + lookup" }); thinking $Think; read $($env:GGML_ESCHA_PREFILL)"
 if ($DraftNote) { Write-Host $DraftNote }
+Write-Host "vision $(if ($Vision -eq 'off') { 'off' } else { "$Vision ($(Split-Path $Mmproj -Leaf)), up to $ImgMax tokens per image" })"
 if ($DryRun) { Write-Host ("args   " + ($SrvArgs -join ' ')); exit 0 }
 
 $logs = Join-Path $Root 'logs'; New-Item -ItemType Directory -Force $logs | Out-Null

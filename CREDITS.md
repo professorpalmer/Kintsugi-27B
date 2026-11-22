@@ -47,6 +47,8 @@ Kintsugi-27B stands on a lot of other people's work. If we missed you, tell us a
 - **Mark Schatza**: native PQ2_0 unpacking in the HIP MMQ loader.
 - **Jason Titus**: Metal PTQ1_0 mat-vec for two to four columns.
 - **Tomer Weller**: Metal language 4.0 when the tensor API is there.
+- **Aldehir Rojas**: the guard for anchored tool-call trigger patterns in the grammar (llama.cpp #32381), ported
+  in v1.1.2.
 
 ## Drafting
 
@@ -55,6 +57,8 @@ Kintsugi-27B stands on a lot of other people's work. If we missed you, tell us a
 - **Inco AI**: the DFlash2 drafter for Qwen3.8-27B (Apache-2.0).
 - **ggml-org**: the Q4_0 GGUF conversion of that drafter, which the launcher uses when you download it (optional,
   from the model page).
+- **ggml-org**: the Q8_0 GGUF of Qwen's vision projector (`mmproj-Qwen3.8-27B-Q8_0.gguf`), which the optional
+  image mode uses (a separate download from their page).
 - **Magnitude (magnitudedev)**: mixed K / V cache types on the tensor-core path. (Credited for the idea; that option is
   under test and not in this build.)
 

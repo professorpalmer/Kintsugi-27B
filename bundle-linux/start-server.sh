@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kintsugi-27B on one 12 GB NVIDIA card (RTX 20 / 30 / 40), Linux x86_64: 262,144-token window, tiered K/V cache,
+# Kintsugi-27B on one 12 GB NVIDIA card (RTX 20 / 30 / 40 / 50, H100), Linux x86_64: 262,144-token window, tiered K/V cache,
 # MTP + lookup drafting. The same defaults and checks as start-server.ps1 of the Windows bundle.
 #
 #   ./start-server.sh [--port 8080] [--wait] [--dry-run]
@@ -19,6 +19,11 @@
 #   KINTSUGI_DRAFT         auto (default: DFlash2 draft 7 when the drafter file is there, else MTP 3 + lookup) | dflash |
 #                          mtp | off; a number = the MTP draft size (0 = no drafting)
 #   KINTSUGI_DRAFTER       DFlash2 drafter file (default models/dflash-Qwen3.8-27B-Q4_0.gguf; an optional download)
+#   KINTSUGI_VISION        auto (default: images on when the projector file is there; the projector on the CPU on a card
+#                          under 16 GB, on the GPU from 16 GB) | gpu | cpu | off. cpu: no VRAM cost, an image reads in
+#                          5-25 s; gpu: ~1.3 GB of VRAM (fewer K/V cells in VRAM), an image reads in 1-3 s
+#   KINTSUGI_MMPROJ        vision projector file (default models/mmproj-Qwen3.8-27B-Q8_0.gguf; an optional download)
+#   KINTSUGI_IMAGE_MAX_TOKENS  tokens for one image at most (default 2048; a larger image is scaled down to fit)
 #   KINTSUGI_THINK         medium (default) | off
 #   KINTSUGI_READ          fast (default: int8 read of long prompts) | exact
 #   KINTSUGI_HEAD2         two-stage output head: exact candidates for each row (default 512; 0 = off)
@@ -81,6 +86,30 @@ else
   echo "WARN   could not read the NVIDIA driver version from nvidia-smi: the driver check is skipped"
 fi
 
+# ---- Card generation: bin/ has native code for compute capability 7.5 / 8.6 / 8.9 (RTX 20 / 30 / 40), 9.0 (H100 / H200)
+# and 12.0 (RTX 50), and portable code (compute_90 PTX) that newer cards compile at the first start. CUDA loads only the
+# code of your card, so the code for the other cards costs no VRAM or speed. KINTSUGI_TEST_CC=<x.y> replaces the value
+# that nvidia-smi gives (tests).
+CC="$(pick TEST_CC '')"
+[ -z "$CC" ] && CC="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader -i 0 2> /dev/null | head -1 | tr -d ' ')"
+SUPPORTED="RTX 20 / 30 / 40 / 50 cards with 12 GB or more, and H100 / H200"
+if [[ "$CC" =~ ^([0-9]+)\.([0-9]+)$ ]]; then
+  CCMAJ=${BASH_REMATCH[1]}; CCMIN=${BASH_REMATCH[2]}; CCN=$((10 * CCMAJ + CCMIN))
+  if [ "$CCN" -lt 75 ]; then
+    echo "This NVIDIA card (compute capability $CC) is older than RTX 20 (Turing, 7.5): Kintsugi-27B has no code for it. Supported: $SUPPORTED."
+    exit 1
+  elif { [ "$CCMAJ" = 7 ] && [ "$CCN" -ne 75 ]; } || { [ "$CCMAJ" = 8 ] && [ "$CCMIN" -lt 6 ]; }; then
+    echo "This NVIDIA card (compute capability $CC, for example a V100 / A100 / A30) has no code in this bundle. Supported: $SUPPORTED."
+    exit 1
+  elif [ "$CCN" -ge 90 ] && [ "$CCN" -ne 90 ] && [ "$CCN" -ne 120 ]; then
+    echo "note   this card (compute capability $CC) runs the engine's portable code: the driver compiles it at the first start (several minutes, once, then cached). We have not tested this card."
+    # the driver's compile cache must hold all of it, or every start compiles again: 4 GiB (the largest value)
+    export CUDA_CACHE_MAXSIZE="${CUDA_CACHE_MAXSIZE:-4294967296}"
+  fi
+else
+  echo "WARN   could not read the card's compute capability from nvidia-smi: the card check is skipped"
+fi
+
 # A driver the runtime cannot use (or no CUDA device) does not stop the engine: it runs on the CPU, very slowly, and still
 # answers. no_gpu_message LOG prints the stop message when the server log shows that.
 no_gpu_message() {
@@ -107,7 +136,7 @@ TOTAL=$(echo "$TOTAL" | tr -dc '0-9'); USED=$(echo "$USED" | tr -dc '0-9'); DISP
 # a headless server GPU can report "Enabled" (seen on a rented RTX 4070, driver 580). KINTSUGI_MARGIN overrides.
 GFX=$(nvidia-smi 2> /dev/null | grep -c -E '^\|[[:space:]]+[0-9]+[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+[0-9]+[[:space:]]+(G|C\+G)[[:space:]]')
 HEADLESS=1; [ "${GFX:-0}" -gt 0 ] && HEADLESS=0
-[ "$TOTAL" -lt 11500 ] && echo "note   this card has $TOTAL MiB; Kintsugi-27B is made for 12 GB cards and may not load"
+[ "$TOTAL" -lt 11500 ] && echo "WARN   this card has $TOTAL MiB of VRAM. Kintsugi-27B needs a 12 GB card (the model alone takes about 9.5 GB): it may not load, or most of the context will be in system RAM and slow."
 MARGIN="$(pick MARGIN $([ $HEADLESS = 1 ] && echo 250 || echo 600))"
 if [ -n "$(pick MARGIN '')" ]; then MARGIN_WHY="KINTSUGI_MARGIN"; elif [ $HEADLESS = 1 ]; then MARGIN_WHY="no display on this card"; else MARGIN_WHY="display on this card: a graphics process in nvidia-smi; KINTSUGI_MARGIN=250 if that is wrong"; fi
 # Fixed footprint at load without the K/V cells (measured on an RTX 4070 with the 10,546,686,688-byte file); a model file
@@ -136,11 +165,36 @@ HEAD2_MIB=0; [ "$HEAD2" -gt 0 ] && HEAD2_MIB=606
 # file moves it by the difference.
 DRAFTER_MIB=0
 [ "$MODE" = dflash ] && DRAFTER_MIB=$(( 765 + ($(stat -L -c %s "$DRAFTER") - 1094346080) / 1048576 ))
-FIXED=$((9473 + HEAD_MIB - HEAD2_MIB + DRAFTER_MIB))
+# ---- Vision: the Qwen3.8 projector (mmproj) reads images; an optional download -------------------------------------
+# auto: on a card under 16 GB the projector runs on the CPU (it keeps every K/V cell in VRAM; on a 12 GB card the GPU
+# projector would leave about 61,000 of 144,000), on 16 GB or more on the GPU (faster image reads).
+# On the GPU it takes VRAM for its weights and for the work of one image at the cap (measured on an RTX 4070), so fewer
+# K/V cells fit in VRAM; the window stays the same. On the CPU (KINTSUGI_VISION=cpu) it takes almost no VRAM and reads an
+# image more slowly.
+MMPROJ="$(pick MMPROJ "$ROOT/models/mmproj-Qwen3.8-27B-Q8_0.gguf")"
+case "$(pick VISION auto | tr '[:upper:]' '[:lower:]')" in
+  auto) if [ ! -f "$MMPROJ" ]; then VISION=off; elif [ "$TOTAL" -ge 15500 ]; then VISION=gpu; else VISION=cpu; fi ;;
+  gpu)  [ -f "$MMPROJ" ] || { echo "vision projector not found: $MMPROJ (set KINTSUGI_MMPROJ, or KINTSUGI_VISION=auto)"; exit 1; }; VISION=gpu ;;
+  cpu)  [ -f "$MMPROJ" ] || { echo "vision projector not found: $MMPROJ (set KINTSUGI_MMPROJ, or KINTSUGI_VISION=auto)"; exit 1; }; VISION=cpu ;;
+  off)  VISION=off ;;
+  *)    echo "KINTSUGI_VISION must be auto, gpu, cpu or off"; exit 1 ;;
+esac
+# DFlash2 does not work with images yet (an image late in a long conversation fails in the drafter): with vision on,
+# drafting is MTP + lookup.
+if [ "$VISION" != off ] && [ "$MODE" = dflash ]; then
+  [ "$DRAFT_SET" = dflash ] && { echo "KINTSUGI_DRAFT=dflash does not work with vision on: set KINTSUGI_VISION=off for DFlash2, or KINTSUGI_DRAFT=auto"; exit 1; }
+  MODE=mtp; DRAFTER_MIB=0
+  DRAFT_NOTE="note   vision on: MTP + lookup drafting (the DFlash2 drafter does not work with images yet; KINTSUGI_VISION=off uses it)"
+fi
+IMG_MAX="$(pick IMAGE_MAX_TOKENS 2048)"
+# Measured for the 629,247,008-byte Q8_0 projector at a 2048-token cap; another file moves it by the difference.
+VISION_MIB=0; [ "$VISION" = gpu ] && VISION_MIB=$(( 852 + ($(stat -L -c %s "$MMPROJ") - 629247008) / 1048576 ))
+FIXED=$((9473 + HEAD_MIB - HEAD2_MIB + DRAFTER_MIB + VISION_MIB))
 # The first request adds about 222 MiB once (cuBLAS, kernel code at first use); the warm-up request pays it at start.
 # Requests of many new lengths then add up to about 210 MiB (CUDA graphs); the margin covers that. With DFlash2, 128 MiB
 # more: Linux needs about 50 MiB more for it than Windows, and the rest keeps the peak 64 MiB or more under the limit.
 GROWTH=222; [ "$MODE" = dflash ] && GROWTH=$((222 + 128))
+[ "$VISION" = gpu ] && GROWTH=$((GROWTH + 512))
 # The driver keeps part of the card for itself ("Reserved" in nvidia-smi -q; 416 MiB on an RTX 4070 with Linux driver 595,
 # 272 MiB with Windows). No program can use it: past the rest, an allocation fails (out of memory). Ceiling = the smaller
 # of 97.7 % of the card and the card less the reserved part less 8 MiB. If nvidia-smi does not show the reserved part,
@@ -241,6 +295,8 @@ ARGS=(-m "$MODEL" -ngl 99 -c "$CTX" -fa on -np 1 -ub "$UB" --fit off --jinja
 [ "$TEMPLATE" != model ] && ARGS+=(--chat-template-file "$TEMPLATE")
 [ -n "$KEY_FILE" ] && ARGS+=(--api-key-file "$KEY_FILE")
 [ -n "$SLOT_DIR" ] && ARGS+=(--slot-save-path "$SLOT_DIR")
+[ "$VISION" != off ] && ARGS+=(--mmproj "$MMPROJ" --image-max-tokens "$IMG_MAX")
+[ "$VISION" = cpu ] && ARGS+=(--no-mmproj-offload)
 EXTRA="$(pick EXTRA '')"
 [ -n "$EXTRA" ] && read -r -a EXTRA_ARGS <<< "$EXTRA" && ARGS+=("${EXTRA_ARGS[@]}")
 
@@ -253,6 +309,7 @@ echo "template $([ "$TEMPLATE" = model ] && echo "the model file's own" || echo 
 case "$MODE" in off) SPEC_TXT=off ;; dflash) SPEC_TXT="DFlash2 draft 7 ($(basename "$DRAFTER"))" ;; *) SPEC_TXT="MTP draft $DRAFT + lookup" ;; esac
 echo "spec   $SPEC_TXT; thinking $THINK; read $GGML_ESCHA_PREFILL"
 [ -n "$DRAFT_NOTE" ] && echo "$DRAFT_NOTE"
+if [ "$VISION" = off ]; then echo "vision off"; else echo "vision $VISION ($(basename "$MMPROJ")), up to $IMG_MAX tokens per image"; fi
 if [ $DRY = 1 ]; then echo "args   ${ARGS[*]}"; exit 0; fi
 
 LOGS="$ROOT/logs"; mkdir -p "$LOGS"

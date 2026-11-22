@@ -1,4 +1,4 @@
-# Kintsugi-27B v1.1.1 for Linux (x86_64, RTX 20 / 30 / 40, 12 GB)
+# Kintsugi-27B v1.1.2 for Linux (x86_64, RTX 20 / 30 / 40 / 50 and H100, 12 GB)
 
 These are the text files of the Linux tarball; download the tarball from
 [Releases](https://github.com/professorpalmer/Kintsugi-27B/releases/latest). The tarball also holds the engine
@@ -12,7 +12,9 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
 
 ## What you need
 
-- An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more. RTX 50 (Blackwell) and H100 (Hopper) are not built in this release yet: coming soon.
+- An NVIDIA RTX 20, 30, 40 or 50 series card with 12 GB of VRAM or more, or an H100 / H200. CUDA loads only your
+  card's code, so the code for the other cards costs no VRAM or speed. Older cards (GTX 10 and before) and V100 / A100
+  have no code in the bundle: the launcher says so and stops.
 - NVIDIA driver 570 or newer. The engine uses the CUDA 12.8 runtime (in `bin/`). On drivers older than the 580
   family, the engine uses another type of pinned system memory for the long context, and writes one WARN line about it.
 - Linux x86_64 with glibc 2.34 or newer and the libstdc++ of GCC 12 or newer (the engine needs GLIBC_2.34 and
@@ -24,10 +26,10 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
 
 ## Download and start
 
-1. Download `Kintsugi-27B-v1.1.1-linux-x86_64.tar.gz` from the Releases page and unpack it:
+1. Download `Kintsugi-27B-v1.1.2-linux-x86_64.tar.gz` from the Releases page and unpack it:
 
    ```
-   tar -xzf Kintsugi-27B-v1.1.1-linux-x86_64.tar.gz
+   tar -xzf Kintsugi-27B-v1.1.2-linux-x86_64.tar.gz
    cd Kintsugi-27B
    ```
 
@@ -57,6 +59,29 @@ with either drafter. To choose by hand: `KINTSUGI_DRAFT=mtp ./start-server.sh --
 
 The drafter is Inco AI's DFlash2 in ggml-org's Q4_0 GGUF, unchanged (Apache-2.0; see NOTICE and CREDITS.md).
 
+## Images (optional download)
+
+Kintsugi-27B can read images with Qwen's vision projector. It is an optional download; the model file does not
+change. Download `mmproj-Qwen3.8-27B-Q8_0.gguf` (629,247,008 bytes, SHA-256
+`2e968a6af97ce35d8971890b257b9b7edabf20ad91450501fa53162a19ee33eb`) from
+https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF and put it in `models/`. The launcher then turns images on (the
+`vision` line). Two modes (`KINTSUGI_VISION`; the default `auto` picks by the card):
+
+- **cpu** (auto on cards under 16 GB): the projector runs on the processor. No VRAM cost: every K/V cell stays in
+  VRAM. An image takes 5-25 s to read (about 5 s for a small screenshot, 25 s for a 2,048-token photo).
+- **gpu** (auto on cards with 16 GB or more): about 1.3 GB of VRAM. An image takes 1-3 s. On a 12 GB card this
+  leaves about 61,000 K/V cells in VRAM instead of 144,000 (the window stays 262,144 tokens; long conversations
+  decode more slowly); a 16 GB card keeps the whole window in VRAM.
+- `KINTSUGI_VISION=off`: images off with the file present; `gpu` / `cpu` force a mode.
+- With images on, drafting is MTP + lookup: the DFlash2 drafter does not work with images yet (the launcher
+  switches to MTP; `KINTSUGI_DRAFT=dflash` with images on stops with a message).
+- Saved conversations: a request with an image is not saved; with images on, saves are full saves (no small delta
+  saves).
+- `KINTSUGI_IMAGE_MAX_TOKENS` (default 2048): a larger image is scaled down to this many tokens.
+
+Images work in chat requests (OpenAI and Anthropic formats) and in tool results (for example a screenshot). The
+built-in web page is not tested with images.
+
 ## How to chat
 
 - **In the browser:** open http://127.0.0.1:8080/.
@@ -79,6 +104,10 @@ then also set `KINTSUGI_KEY_FILE` to a file holding an API key. Logs are in `log
 
 ## Known limits
 
+- RTX 50 and H100 were tested on rented machines (RTX 5070 12 GB; H100 80 GB): the same model fidelity (KL) as our
+  RTX 4070, full recall at 117k and 245k tokens. Since v1.1.2 the browser chat page also works on Linux.
+- Newer cards (for example B200, or compute capability 12.1) run the engine's portable code: the driver compiles it at
+  the first start (about 1.5 minutes in our test on an RTX 5070 run on that code; later starts about 10 s, from the driver's cache). We have not tested these cards.
 - Decode at a very long context is slower: about 31 tok/s at 245k tokens on an RTX 4070. Short chats are much faster.
 - The first read of a very long prompt takes about 7 minutes for 245k tokens on an RTX 4070; later turns read only the
   new text.

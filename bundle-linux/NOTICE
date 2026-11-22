@@ -1,4 +1,4 @@
-Kintsugi-27B v1.1.1 for Linux (x86_64) - notices
+Kintsugi-27B v1.1.2 for Linux (x86_64) - notices
 
 Our files in this bundle (start-server.sh, stop.sh, the layer in layer/, README.md, CREDITS.md and the other text files)
 are licensed under the Apache License, Version 2.0 (see LICENSE).
@@ -15,12 +15,14 @@ Third-party software in this bundle:
    It includes:
    - the EXL3 trellis kernels from exllamav3 (turboderp), MIT License, Copyright (c) 2025 Turboderp.
      Full text: licenses/LICENSE-exllamav3.
+   - the web chat page (llama.cpp's tools/ui, MIT), built from that source and embedded in the server.
    - cpp-httplib (Yuji Hirose, MIT), nlohmann/json (Niels Lohmann, MIT), and the hash and other vendored components of
      llama.cpp under their own licences: licenses/vendor/.
    The fork's changes (the Escha / EXL3 trellis op, the tiered K/V cache, the two-stage output head, background saves,
-   the host-memory fallback for older drivers and the other serving changes) are under the same MIT License. The Escha
+   the host-memory fallback for older drivers and the other serving changes; the grammar guard for anchored
+   tool-call triggers is ported from llama.cpp #32381 by Aldehir Rojas) are under the same MIT License. The Escha
    op for ggml comes from Ajay9o9's llama.cpp-escha (MIT). The engine source of this build is a release asset
-   (Kintsugi-27B-v1.1-engine-src-5f393adb5.tar.gz).
+   (Kintsugi-27B-v1.1.2-engine-src-b9c5b427d.tar.gz).
 
 2. NVIDIA CUDA 12.8 runtime libraries in bin/ (libcudart.so.12, libcublas.so.12, libcublasLt.so.12) are NVIDIA's
    binaries, redistributed unmodified under the NVIDIA CUDA Toolkit End User License Agreement
@@ -32,7 +34,11 @@ Third-party software in this bundle:
    GGUF of ggml-org (https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF, revision cc54a8a3), unchanged. Apache License,
    Version 2.0 (the same text as LICENSE). Please cite DFlash 2 and DFlash (CREDITS.md).
 
-4. The layer (layer/) comes from our own Bonsai / Mirai serving layer. Its sandbox tools (off in this build) would use
+4. The optional vision projector (not in this bundle; models/mmproj-Qwen3.8-27B-Q8_0.gguf, downloaded separately):
+   the Qwen3.8-27B vision encoder by the Qwen team (Apache-2.0), converted to GGUF by ggml-org with llama.cpp's
+   convert_hf_to_gguf.py (MIT), https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF, unchanged.
+
+5. The layer (layer/) comes from our own Bonsai / Mirai serving layer. Its sandbox tools (off in this build) would use
    the Python package wasmtime (Bytecode Alliance, Apache-2.0 WITH LLVM-exception); it is not in this bundle and not
    needed.
 
@@ -44,6 +50,6 @@ made the fits. escha-mlx (Escha Labs, Apache-2.0) reference functions computed t
 Full credits: CREDITS.md. No person or company named here endorses or sponsors this project.
 
 bin/libgomp.so.1: the GCC OpenMP runtime library (GNU Offloading and Multi Processing Runtime Library),
-unmodified, from the Ubuntu package libgomp1 12.3.0-1ubuntu1~22.04. Licence: GPL-3.0-or-later WITH GCC-exception-3.1 (the
+unmodified, from the Ubuntu package libgomp1 12.3.0-1ubuntu1~22.04.3. Licence: GPL-3.0-or-later WITH GCC-exception-3.1 (the
 GCC Runtime Library Exception 3.1); texts in licenses/LICENSE-libgomp-GPL-3.0 and
-licenses/LICENSE-libgomp-GCC-RLE-3.1. Corresponding source: https://launchpad.net/ubuntu/+source/gcc-12/12.3.0-1ubuntu1~22.04
+licenses/LICENSE-libgomp-GCC-RLE-3.1. Corresponding source: https://launchpad.net/ubuntu/+source/gcc-12/12.3.0-1ubuntu1~22.04.3

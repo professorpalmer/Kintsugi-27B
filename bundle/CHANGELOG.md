@@ -5,6 +5,35 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.1.2 (2026-11-22)
+
+- **Optional images.** Download Qwen's vision projector (`mmproj-Qwen3.8-27B-Q8_0.gguf`, 629 MB, from ggml-org's
+  Qwen3.8-27B-GGUF page) into `models`, and the launcher turns images on: in chat requests (OpenAI and Anthropic
+  formats) and in tool results. On a card under 16 GB the projector runs on the CPU (no VRAM cost, 5-25 s per image);
+  from 16 GB on the GPU (1-3 s). `KINTSUGI_VISION=auto|cpu|gpu|off`. With images on, drafting is MTP + lookup (the
+  DFlash2 drafter does not work with images yet). Our checks: 19/20 on our image set (the same as stock llama.cpp with
+  the same files), images after a 117k-token conversation 4/4, the same text output with the projector loaded (50 / 50
+  prompts), Claude Code 5/6 plus an image task. The built-in web page is not tested with images.
+- **RTX 50 (Blackwell) and H100 / H200 (Hopper).** The engine now has native code for RTX 50 (sm_120) and Hopper
+  (sm_90), as well as RTX 20 / 30 / 40, and portable code (compute_90 PTX) for newer cards. Tested on rented Linux machines
+  (RTX 5070 12 GB, H100 80 GB): the same model fidelity as our RTX 4070 (mean KL on the quant-challenge golden set
+  0.056414 and 0.056407 vs 0.056398; top-1 within 0.02 points), 24 / 24 needles and 20 / 20 exact code copies at 117k
+  and 245k tokens, tool calls t1-t4, and no memory spill. CUDA loads only your card's code, so the other cards' code
+  costs no VRAM or speed, only download size (Windows zip 679 MB, was 581 MB; Linux tarball 786 MB, was 684 MB).
+- **Newer cards** (for example B200, or compute capability 12.1) run the portable code. The driver compiles it at the
+  first start and keeps it in its cache: in our test (an RTX 5070 run on that code) the first start took about 1.5
+  minutes and later starts about 10 s. The launcher sets a 4 GiB cache for these cards. On Windows this needs a driver
+  that supports CUDA 13.4. Not tested by us on such cards.
+- **The launcher checks the card** (compute capability) and stops with a clear message on a card the bundle has no code
+  for (GTX 10 and older, V100, A100). On a card with less than 12 GB it prints a clearer warning.
+- **Linux: the web chat page works** (http://127.0.0.1:8080/); v1.0.4-v1.1.1 Linux engines were built without it.
+- A grammar fix from llama.cpp (#32381, Aldehir Rojas): an anchored tool-call trigger pattern no longer falls back to
+  a search. Kintsugi's own tool calls use a fixed tag, so they do not change.
+- RTX 20 / 30 / 40: no change in output. On our RTX 4070 the v1.1.2 engine gives the same tokens as v1.1 (50 / 50
+  prompts) at the same speed.
+- Engine source `b9c5b427d`. Windows: `Kintsugi-27B-v1.1.2-win-x64.zip`, sha256 `64c53e48886f95e083f41223296aeb4dc30f8f6630bdca91db6d03d0d190e4e3`. Linux:
+  `Kintsugi-27B-v1.1.2-linux-x86_64.tar.gz`, sha256 `46f19175b63e6a425f2f2ff9face014aa1f36f2bba6185bc26203689e756d86a`.
+
 ## v1.1.1 (2026-11-21, Linux only)
 
 - **Linux: the engine no longer needs NCCL (libnccl.so.2).** The v1.0.4 and v1.1 Linux engines did not start on a

@@ -18,11 +18,16 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 - **Gated on tasks, not only on KL**: every candidate bit map had to pass long-context recall, long-answer and agent
   tests. Our maps with lower KL failed them and did not ship ([the study](research/bit-allocation/README.md)).
 - **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
+- **Optional images (v1.1.2)**: with Qwen's vision projector (a separate download), it reads images in chat and in
+  tool results (screenshots); on a 12 GB card the projector runs on the CPU and costs no VRAM
+  ([bundle/README.md](bundle/README.md#images-optional-download)).
 - **Rules hold deep into agent sessions**: after up to 237k tokens of its own agent trace, Kintsugi-27B kept all five
   standing system-prompt rules with no decay, and was not worse than Qwen3.8-27B BF16 on any rule or depth
   ([research/persistence-at-depth](research/persistence-at-depth/README.md); the test sees only large gaps).
-- **Runs on RTX 20, 30 and 40 cards** with 12 GB or more, and **on Apple Silicon Macs** ([mac/](mac/README.md): chat
-  and an OpenAI-compatible server; tested on an M5 Max). **Coming soon:** RTX 50 (Blackwell) and H100 (Hopper). AMD (ROCm / HIP) support is in progress. Intel GPUs are not supported yet. Stock
+- **Runs on RTX 20, 30, 40 and 50 cards and on H100 / H200** with 12 GB or more (RTX 50 and H100 from v1.1.2: one
+  download for all of them; CUDA loads only your card's code, so the others cost no VRAM or speed), and **on Apple
+  Silicon Macs** ([mac/](mac/README.md): chat and an OpenAI-compatible server; tested on an M5 Max). AMD (ROCm / HIP)
+  support is in progress. Intel GPUs are not supported yet. Stock
   llama.cpp, Ollama and LM Studio cannot load this file.
 - **Fully open**: Apache-2.0 for the model and our files, MIT for the engine. The engine source is in every release.
   The NVIDIA CUDA DLLs in the zip are NVIDIA's (see [NOTICE](NOTICE)).
@@ -50,7 +55,7 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 
 You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](bundle/README.md).
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.1.1-linux-x86_64.tar.gz` from the same Releases page, then
+**Linux (x86_64):** download `Kintsugi-27B-v1.1.2-linux-x86_64.tar.gz` from the same Releases page, then
 `tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
 glibc 2.34+ (Ubuntu 22.04 and 24.04); no other libraries. Full guide: [bundle-linux/README.md](bundle-linux/README.md).
 

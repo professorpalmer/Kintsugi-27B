@@ -1,4 +1,4 @@
-# Kintsugi-27B bundle: user guide (Windows, RTX 20 / 30 / 40, 12 GB)
+# Kintsugi-27B bundle: user guide (Windows, RTX 20 / 30 / 40 / 50 and H100, 12 GB)
 
 This folder holds the text files of the Windows zip. Download the zip from
 [Releases](https://github.com/professorpalmer/Kintsugi-27B/releases/latest). The zip also holds the engine (`bin\`),
@@ -11,12 +11,15 @@ end). Pull requests are welcome.
 
 ## What you need
 
-- An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more. Examples: RTX 2060 12 GB, 3060 12 GB, 3080 12 GB,
-  3080 Ti, 3090, 4060 Ti 16 GB, 4070 and up, 4090.
-  - RTX 50 series (Blackwell) and H100 (Hopper) are not in this build yet: coming soon.
+- An NVIDIA RTX 20, 30, 40 or 50 series card with 12 GB of VRAM or more, or an H100 / H200. Examples: RTX 2060 12 GB,
+  3060 12 GB, 3080 12 GB, 3080 Ti, 3090, 4060 Ti 16 GB, 4070 and up, 4090, 5060 Ti 16 GB, 5070 and up, 5090.
+  - The bundle carries code for all of them (RTX 50 and H100 from v1.1.2). CUDA loads only your card's code, so this
+    costs no VRAM or speed, only download size.
+  - Older cards (GTX 10 and before) and V100 / A100 have no code in the bundle: the launcher says so and stops.
   - Cards with less than 12 GB cannot hold the model.
   - On 16-24 GB cards, the launcher keeps the whole context in VRAM, so long-context speed is much higher.
-  - We checked Turing (RTX 20 class, on a card limited to 12 GB), Ampere and Ada: the results are the same within 1 %.
+  - We checked Turing (RTX 20 class, on a card limited to 12 GB), Ampere, Ada, Blackwell (RTX 5070) and Hopper (H100):
+    the results are the same within 1 % ([cross-architecture](../research/cross-architecture/README.md)).
 - NVIDIA driver 580 or newer (the bundle carries its own CUDA 13 runtime). The launcher stops with a message if the
   driver is too old.
 - Windows 10 or 11, 64-bit. 32 GB of system RAM or more is best for very long chats.
@@ -48,6 +51,29 @@ Without the file the launcher uses the model's own MTP drafter, as before, and p
 with either drafter. To choose by hand: `$env:KINTSUGI_DRAFT = 'mtp'` (or `dflash`, `off`).
 
 The drafter is Inco AI's DFlash2 in ggml-org's Q4_0 GGUF, unchanged (Apache-2.0; see NOTICE and CREDITS.md).
+
+## Images (optional download)
+
+Kintsugi-27B can read images with Qwen's vision projector. It is an optional download; the model file does not
+change. Download `mmproj-Qwen3.8-27B-Q8_0.gguf` (629,247,008 bytes, SHA-256
+`2e968a6af97ce35d8971890b257b9b7edabf20ad91450501fa53162a19ee33eb`) from
+https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF and put it in `models\`. The launcher then turns images on (the
+`vision` line). Two modes (`KINTSUGI_VISION`; the default `auto` picks by the card):
+
+- **cpu** (auto on cards under 16 GB): the projector runs on the processor. No VRAM cost: every K/V cell stays in
+  VRAM. An image takes 5-25 s to read (about 5 s for a small screenshot, 25 s for a 2,048-token photo).
+- **gpu** (auto on cards with 16 GB or more): about 1.3 GB of VRAM. An image takes 1-3 s. On a 12 GB card this
+  leaves about 61,000 K/V cells in VRAM instead of 144,000 (the window stays 262,144 tokens; long conversations
+  decode more slowly); a 16 GB card keeps the whole window in VRAM.
+- `KINTSUGI_VISION=off`: images off with the file present; `gpu` / `cpu` force a mode.
+- With images on, drafting is MTP + lookup: the DFlash2 drafter does not work with images yet (the launcher
+  switches to MTP; `KINTSUGI_DRAFT=dflash` with images on stops with a message).
+- Saved conversations: a request with an image is not saved; with images on, saves are full saves (no small delta
+  saves).
+- `KINTSUGI_IMAGE_MAX_TOKENS` (default 2048): a larger image is scaled down to this many tokens.
+
+Images work in chat requests (OpenAI and Anthropic formats) and in tool results (for example a screenshot). The
+built-in web page is not tested with images.
 
 ## How to chat
 
@@ -116,7 +142,11 @@ How the answers felt (long-document answers, chat after a restart, code, tools):
 - Very long reasoning answers can be less faithful than short ones. If an answer goes off track, ask again or ask for a
   shorter answer.
 - One chat at a time (one slot). By default, the server listens on 127.0.0.1 only.
-- RTX 50 series (Blackwell) and H100 (Hopper) are not built in this release yet: coming soon.
+- RTX 50 and H100 were tested on rented Linux machines; the Windows build of that code (CUDA 13.4) passed the same
+  fidelity check on the RTX 5070 under Linux. We have not run it on an RTX 50 under Windows ourselves.
+- Newer cards (for example B200, or compute capability 12.1) run the engine's portable code: the driver compiles it at
+  the first start (about 1.5 minutes in our test on an RTX 5070 run on that code; later starts about 10 s, from the driver's cache). We have not tested these cards.
+  On Windows this needs a driver that supports CUDA 13.4.
 - On RTX 20 (Turing) cards, drafting (MTP or DFlash2) is not bit-identical to one-token decoding: near ties can round
   the other way in the verify path. The fidelity is the same (our Turing KL check). On RTX 30 / 40 it is bit-identical.
 
