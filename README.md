@@ -18,9 +18,9 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 - **Gated on tasks, not only on KL**: every candidate bit map had to pass long-context recall, long-answer and agent
   tests. Our maps with lower KL failed them and did not ship ([the study](research/bit-allocation/README.md)).
 - **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
-- **Runs on RTX 20, 30 and 40 cards** with 12 GB or more. NVIDIA only for now: AMD (ROCm / HIP) and Intel GPUs are
-  not supported yet, because the engine's own kernels are CUDA only. Stock llama.cpp, Ollama and LM Studio cannot load
-  this file.
+- **Runs on RTX 20, 30 and 40 cards** with 12 GB or more. **Coming soon:** RTX 50 (Blackwell), H100 (Hopper) and a
+  native Apple Silicon (Mac) version. AMD (ROCm / HIP) support is in progress. Intel GPUs are not supported yet. Stock
+  llama.cpp, Ollama and LM Studio cannot load this file.
 - **Fully open**: Apache-2.0 for the model and our files, MIT for the engine. The engine source is in every release.
   The NVIDIA CUDA DLLs in the zip are NVIDIA's (see [NOTICE](NOTICE)).
 - **Head-to-head on one 12 GB card**: against Inkling 2 Mini, 4x the context, perfect recall at 245k where Inkling

@@ -92,4 +92,4 @@ within 1 %. So KL is the test that decides across architectures; identity stays 
   the same.
 - We found no rentable RTX 2060 12 GB box with enough system RAM; the Turing result comes from a Quadro RTX 6000 held
   to 12 GB.
-- No RTX 50 (Blackwell) build.
+- No RTX 50 (Blackwell) build in this study. Blackwell and Hopper support is coming soon, with its own checks.

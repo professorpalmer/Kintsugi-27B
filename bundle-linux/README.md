@@ -12,7 +12,7 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
 
 ## What you need
 
-- An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more. RTX 50 (Blackwell) is not built in this release.
+- An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more. RTX 50 (Blackwell) and H100 (Hopper) are not built in this release yet: coming soon.
 - NVIDIA driver 570 or newer. The engine uses the CUDA 12.8 runtime (in `bin/`). On drivers older than the 580
   family, the engine uses another type of pinned system memory for the long context, and writes one WARN line about it.
 - Linux x86_64 with glibc 2.34 or newer and the libstdc++ of GCC 12 or newer (the engine needs GLIBC_2.34 and

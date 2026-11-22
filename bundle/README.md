@@ -13,8 +13,7 @@ end). Pull requests are welcome.
 
 - An NVIDIA RTX 20, 30 or 40 series card with 12 GB of VRAM or more. Examples: RTX 2060 12 GB, 3060 12 GB, 3080 12 GB,
   3080 Ti, 3090, 4060 Ti 16 GB, 4070 and up, 4090.
-  - RTX 50 series (Blackwell) is NOT supported in this build, by choice. The project targets the cards that most people
-    already have.
+  - RTX 50 series (Blackwell) and H100 (Hopper) are not in this build yet: coming soon.
   - Cards with less than 12 GB cannot hold the model.
   - On 16-24 GB cards, the launcher keeps the whole context in VRAM, so long-context speed is much higher.
   - We checked Turing (RTX 20 class, on a card limited to 12 GB), Ampere and Ada: the results are the same within 1 %.
@@ -117,7 +116,7 @@ How the answers felt (long-document answers, chat after a restart, code, tools):
 - Very long reasoning answers can be less faithful than short ones. If an answer goes off track, ask again or ask for a
   shorter answer.
 - One chat at a time (one slot). By default, the server listens on 127.0.0.1 only.
-- RTX 50 series (Blackwell) is not built in this release, by choice.
+- RTX 50 series (Blackwell) and H100 (Hopper) are not built in this release yet: coming soon.
 - On RTX 20 (Turing) cards, drafting (MTP or DFlash2) is not bit-identical to one-token decoding: near ties can round
   the other way in the verify path. The fidelity is the same (our Turing KL check). On RTX 30 / 40 it is bit-identical.
 
