@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Voxel Pagoda</title>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; }
+  #info { position: absolute; top: 10px; left: 10px; color: #ddd; font-family: monospace; font-size: 13px; background: rgba(0,0,0,0.5); padding: 6px 10px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="info">Voxel Pagoda &mdash; Three.js</div>
+<script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+<script>
+(function () {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0e1520);
+  scene.fog = new THREE.Fog(0x0e1520, 50, 130);
+
+  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0x404050, 1.0));
+  scene.add(new THREE.HemisphereLight(0xc0d8ff, 0x3a2b1a, 0.4));
+  const sun = new THREE.DirectionalLight(0xfff0d0, 1.8);
+  sun.position.set(20, 40, 15);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -40;
+  sun.shadow.camera.right = 40;
+  sun.shadow.camera.top = 45;
+  sun.shadow.camera.bottom = -40;
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 100;
+  scene.add(sun);
+
+  // Ground
+  const groundGeo = new THREE.PlaneGeometry(150, 150);
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x3a5c30, roughness: 1 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.5;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Voxel materials
+  const matStone  = new THREE.MeshStandardMaterial({ color: 0x9a948a, roughness: 0.9 });
+  const matWood   = new THREE.MeshStandardMaterial({ color: 0xa06830, roughness: 0.8 });
+  const matRoof   = new THREE.MeshStandardMaterial({ color: 0x8b2a2a, roughness: 0.7 });
+  const matGold   = new THREE.MeshStandardMaterial({ color: 0xe8c14a, roughness: 0.3, metalness: 0.5 });
+  const matRoofTip = new THREE.MeshStandardMaterial({ color: 0xd4a040, roughness: 0.4 });
+
+  const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+
+  function addVoxel(x, y, z, mat) {
+    const m = new THREE.Mesh(cubeGeo, mat);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    scene.add(m);
+  }
+
+  // Solid filled square at level y, centered at (cx,cz), width w (odd)
+  function solid(cx, y, cz, w, mat) {
+    const h = Math.floor(w / 2);
+    for (let dx = -h; dx <= h; dx++)
+      for (let dz = -h; dz <= h; dz++)
+        addVoxel(cx + dx, y, cz + dz, mat);
+  }
+
+  // Outer ring only (perimeter) at level y
+  function ring(cx, y, cz, w, mat) {
+    const h = Math.floor(w / 2);
+    for (let dx = -h; dx <= h; dx++)
+      for (let dz = -h; dz <= h; dz++)
+        if (Math.max(Math.abs(dx), Math.abs(dz)) === h)
+          addVoxel(cx + dx, y, cz + dz, mat);
+  }
+
+  const CX = 0, CZ = 0;
+
+  // === BASE (stepped, monotonically narrowing) ===
+  solid(CX, 0, CZ, 15, matStone);
+  solid(CX, 1, CZ, 13, matStone);
+  solid(CX, 2, CZ, 11, matStone);
+  solid(CX, 3, CZ,  9, matStone);
+
+  // === TIER 1 (body width 9, roof width 9) ===
+  solid(CX, 4, CZ,  9, matWood);
+  solid(CX, 5, CZ,  9, matWood);
+  solid(CX, 6, CZ,  9, matWood);
+  solid(CX, 7, CZ,  9, matRoof);
+  solid(CX, 8, CZ,  9, matRoof);
+  ring(CX, 7, CZ,  9, matRoofTip);
+  ring(CX, 8, CZ,  9, matRoofTip);
+
+  // === TIER 2 (body width 7, roof width 7) ===
+  solid(CX, 9, CZ,  7, matWood);
+  solid(CX, 10, CZ, 7, matWood);
+  solid(CX, 11, CZ, 7, matWood);
+  solid(CX, 12, CZ, 7, matRoof);
+  solid(CX, 13, CZ, 7, matRoof);
+  ring(CX, 12, CZ, 7, matRoofTip);
+  ring(CX, 13, CZ, 7, matRoofTip);
+
+  // === TIER 3 (body width 7, roof width 7) ===
+  solid(CX, 14, CZ, 7, matWood);
+  solid(CX, 15, CZ, 7, matWood);
+  solid(CX, 16, CZ, 7, matWood);
+  solid(CX, 17, CZ, 7, matRoof);
+  solid(CX, 18, CZ, 7, matRoof);
+  ring(CX, 17, CZ, 7, matRoofTip);
+  ring(CX, 18, CZ, 7, matRoofTip);
+
+  // === TIER 4 (body width 5, roof width 5) ===
+  solid(CX, 19, CZ, 5, matWood);
+  solid(CX, 20, CZ, 5, matWood);
+  solid(CX, 21, CZ, 5, matWood);
+  solid(CX, 22, CZ, 5, matRoof);
+  solid(CX, 23, CZ, 5, matRoof);
+  ring(CX, 22, CZ, 5, matRoofTip);
+  ring(CX, 23, CZ, 5, matRoofTip);
+
+  // === TIER 5 (body width 5, roof width 5) ===
+  solid(CX, 24, CZ, 5, matWood);
+  solid(CX, 25, CZ, 5, matWood);
+  solid(CX, 26, CZ, 5, matWood);
+  solid(CX, 27, CZ, 5, matRoof);
+  solid(CX, 28, CZ, 5, matRoof);
+  ring(CX, 27, CZ, 5, matRoofTip);
+  ring(CX, 28, CZ, 5, matRoofTip);
+
+  // === SPIRE ===
+  solid(CX, 29, CZ, 3, matGold);
+  solid(CX, 30, CZ, 1, matGold);
+  solid(CX, 31, CZ, 1, matGold);
+  solid(CX, 32, CZ, 1, matGold);
+  solid(CX, 33, CZ, 1, matGold);
+  addVoxel(CX, 34, CZ, matRoofTip);
+
+  // === CAMERA ORBIT ===
+  let angle = 0;
+  const radius = 38;
+  const camHeight = 24;
+  const target = new THREE.Vector3(0, 16, 0);
+
+  function animate() {
+    requestAnimationFrame(animate);
+    angle += 0.004;
+    camera.position.set(Math.cos(angle) * radius, camHeight, Math.sin(angle) * radius);
+    camera.lookAt(target);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+</script>
+</body>
+</html>

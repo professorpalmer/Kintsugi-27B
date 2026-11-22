@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Voxel Pagoda</title>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script>
+(function () {
+  // ---------- Scene setup ----------
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9fd3f0);
+  scene.fog = new THREE.Fog(0x9fd3f0, 120, 320);
+
+  var camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  // ---------- Lighting ----------
+  var hemi = new THREE.HemisphereLight(0xdfeeff, 0x556b2f, 0.7);
+  scene.add(hemi);
+
+  var sun = new THREE.DirectionalLight(0xfff2d0, 1.1);
+  sun.position.set(60, 90, 40);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -80;
+  sun.shadow.camera.right = 80;
+  sun.shadow.camera.top = 100;
+  sun.shadow.camera.bottom = -80;
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 300;
+  scene.add(sun);
+
+  // ---------- Ground plane ----------
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(400, 400),
+    new THREE.MeshStandardMaterial({ color: 0x69a05a, roughness: 1 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // ---------- Voxel builder ----------
+  // Voxels are integer grid coordinates; y = layer from the ground.
+  var voxels = {}; // color -> [[x,y,z], ...]
+
+  function addVoxel(color, x, y, z) {
+    (voxels[color] = voxels[color] || []).push([x, y, z]);
+  }
+
+  // Solid square block centered at (cx,cz), side length = 2*half+1
+  function addSolid(color, cx, cz, half, y0, y1) {
+    for (var y = y0; y <= y1; y++) {
+      for (var x = -half; x <= half; x++) {
+        for (var z = -half; z <= half; z++) {
+          addVoxel(color, cx + x, y, cz + z);
+        }
+      }
+    }
+  }
+
+  // Hollow square ring (perimeter) at a single layer y
+  function addRing(color, cx, cz, half, y) {
+    for (var x = -half; x <= half; x++) {
+      addVoxel(color, cx + x, y, cz + half);
+      addVoxel(color, cx + x, y, cz - half);
+    }
+    for (var z = -half + 1; z <= half - 1; z++) {
+      addVoxel(color, cx + half, y, cz + z);
+      addVoxel(color, cx - half, y, cz + z);
+    }
+  }
+
+  // ---------- Build the pagoda ----------
+  var STONE = 0x9a8f7a;
+  var WOOD  = 0x8b4a2b;
+  var DARK  = 0x33261c;
+  var ROOF  = 0xb03030;
+  var ROOFEDGE = 0x7d2020;
+  var GOLD  = 0xffd54a;
+
+  // Base platform: 25x25, 3 layers tall
+  addSolid(STONE, 0, 0, 12, 0, 2);
+  addRing(DARK, 0, 0, 12, 2); // stone rim accent
+
+  // Five tiers, shrinking in size
+  var halves = [10, 8, 6, 5, 4];
+  var y = 3;
+  for (var i = 0; i < 5; i++) {
+    var half = halves[i];
+    // Body: 4 layers of wood, with a dark "window" band
+    addSolid(WOOD, 0, 0, half, y, y + 1);
+    addRing(DARK, 0, 0, half, y + 2);   // window band
+    addSolid(WOOD, 0, 0, half, y + 3, y + 3);
+    // Roof: wider ring than the body, at the top of the body
+    var roofHalf = half + 2;
+    addRing(ROOF, 0, 0, roofHalf, y + 4);
+    addRing(ROOFEDGE, 0, 0, roofHalf, y + 4); // overlay edge? (kept below)
+    // Upturned eave corners (lifted by one voxel)
+    addVoxel(ROOF, roofHalf, y + 5, roofHalf);
+    addVoxel(ROOF, roofHalf, y + 5, -roofHalf);
+    addVoxel(ROOF, -roofHalf, y + 5, roofHalf);
+    addVoxel(ROOF, -roofHalf, y + 5, -roofHalf);
+    // Next tier sits on top of the roof
+    y += 6;
+  }
+
+  // Spire: small platform + tapering column + gold finial
+  addSolid(WOOD, 0, 0, 2, y, y);          // 5x5 cap platform
+  addSolid(GOLD, 0, 0, 1, y + 1, y + 1);  // 3x3 ring-like base
+  addSolid(GOLD, 0, 0, 0, y + 2, y + 7);  // 1x1 column
+  addVoxel(GOLD, 0, y + 8, 0);            // finial ball
+
+  // ---------- Instanced voxel meshes ----------
+  var boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  var m4 = new THREE.Matrix4();
+
+  Object.keys(voxels).forEach(function (color) {
+    var list = voxels[color];
+    var mat = new THREE.MeshStandardMaterial({ color: +color, roughness: 0.85 });
+    var mesh = new THREE.InstancedMesh(boxGeo, mat, list.length);
+    for (var i = 0; i < list.length; i++) {
+      m4.makeTranslation(list[i][0], list[i][1] + 0.5, list[i][2]);
+      mesh.setMatrixAt(i, m4);
+    }
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+  });
+
+  // ---------- Camera orbit ----------
+  var clock = new THREE.Clock();
+  var focus = new THREE.Vector3(0, 18, 0);
+
+  function animate() {
+    requestAnimationFrame(animate);
+    var t = clock.getElapsedTime();
+    var a = t * 0.25; // slow orbit
+    camera.position.set(Math.sin(a) * 70, 45, Math.cos(a) * 70);
+    camera.lookAt(focus);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+</script>
+</body>
+</html>

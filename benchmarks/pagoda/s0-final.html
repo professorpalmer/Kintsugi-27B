@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxel Pagoda</title>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #111; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x18242f);
+scene.fog = new THREE.Fog(0x18242f, 60, 160);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// Lighting
+const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x3a2c1c, 0.55);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d0, 1.4);
+sun.position.set(35, 60, 25);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -45;
+sun.shadow.camera.right = 45;
+sun.shadow.camera.top = 45;
+sun.shadow.camera.bottom = -45;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 150;
+scene.add(sun);
+const rim = new THREE.DirectionalLight(0x66aaff, 0.35);
+rim.position.set(-30, 20, -30);
+scene.add(rim);
+
+// Ground plane
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(400, 400),
+  new THREE.MeshStandardMaterial({ color: 0x3f6b35, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = 0;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Voxel helpers
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+const materials = {};
+function mat(color, opts = {}) {
+  const key = color + JSON.stringify(opts);
+  if (!materials[key]) {
+    materials[key] = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: opts.metalness ?? 0.05 });
+  }
+  return materials[key];
+}
+function voxel(x, y, z, color, m) {
+  const mesh = new THREE.Mesh(boxGeo, m || mat(color));
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+function slab(size, y, color, m) {
+  const half = size / 2;
+  for (let x = -half; x < half; x++)
+    for (let z = -half; z < half; z++)
+      voxel(x, y, z, color, m);
+}
+
+// Colors
+const C_STONE  = 0x9a9178;
+const C_STONE2 = 0x7c745f;
+const C_WOOD   = 0x9c4430;
+const C_WOOD2  = 0x7a2f22;
+const C_ROOF   = 0x2b2b30;
+const C_GOLD   = 0xe6b43c;
+
+// Base platform
+// slab(13, 0.5): center y=0.5, bottom=0, top=1
+// slab(11, 1.5): center y=1.5, bottom=1, top=2
+slab(13, 0.5, C_STONE2);
+slab(11, 1.5, C_STONE);
+
+// Tiers: track yTop as the Y-coordinate of the top surface
+const tiers = [
+  { col: 8, roof: 12 },
+  { col: 7, roof: 10 },
+  { col: 6, roof: 8 },
+  { col: 5, roof: 6 },
+  { col: 4, roof: 5 }
+];
+const COL_H = 3;
+
+let yTop = 2; // top surface of base platform
+
+for (const t of tiers) {
+  // Column: 3 voxels stacked, each 1 unit tall
+  // First voxel center = yTop + 0.5, so bottom = yTop (touches surface below)
+  for (let i = 0; i < COL_H; i++) {
+    const y = yTop + 0.5 + i;
+    slab(t.col, y, i % 2 === 0 ? C_WOOD : C_WOOD2);
+  }
+
+  // Top of column = yTop + COL_H
+  // Roof: center at yTop + COL_H + 0.5, bottom = yTop + COL_H (touches column top)
+  const roofY = yTop + COL_H + 0.5;
+  slab(t.roof, roofY, C_ROOF);
+
+  // Gold corner tips: same y as roof, at the four corners of the roof slab
+  const h = t.roof / 2;
+  const corners = [[-h, -h], [-h, h - 1], [h - 1, -h], [h - 1, h - 1]];
+  for (const [cx, cz] of corners) {
+    voxel(cx, roofY, cz, C_GOLD, mat(C_GOLD, { metalness: 0.6 }));
+  }
+
+  // Top of roof = roofY + 0.5
+  yTop = roofY + 0.5;
+}
+
+// Spire: each voxel bottom touches the top surface of the one below
+// yTop is the top surface of the last roof
+slab(4, yTop + 0.5, C_WOOD2);
+slab(3, yTop + 1.5, C_WOOD2);
+slab(2, yTop + 2.5, C_WOOD2);
+voxel(0, yTop + 3.5, 0, C_WOOD2);
+voxel(0, yTop + 4.5, 0, C_GOLD, mat(C_GOLD, { metalness: 0.6 }));
+voxel(0, yTop + 5.5, 0, C_GOLD, mat(C_GOLD, { metalness: 0.6 }));
+
+// Camera orbit
+let theta = 0;
+const radius = 38;
+const orbitY = 18;
+const target = new THREE.Vector3(0, 14, 0);
+
+function animate() {
+  requestAnimationFrame(animate);
+  theta += 0.0035;
+  camera.position.set(Math.sin(theta) * radius, orbitY, Math.cos(theta) * radius);
+  camera.lookAt(target);
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

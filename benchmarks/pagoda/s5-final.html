@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Voxel Pagoda</title>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; }
+  #c { display: block; width: 100vw; height: 100vh; }
+  .label {
+    position: fixed; top: 12px; left: 12px; color: #fff;
+    font-family: monospace; background: rgba(0,0,0,.5);
+    padding: 6px 10px; border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="label">Voxel Pagoda &mdash; Three.js</div>
+<canvas id="c"></canvas>
+
+<script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+<script>
+(function () {
+  var canvas = document.getElementById('c');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x101824);
+  scene.fog = new THREE.Fog(0x101824, 60, 160);
+
+  var camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 300);
+  scene.add(camera);
+
+  // ---- Lights ----
+  var ambient = new THREE.AmbientLight(0x8899bb, 0.7);
+  scene.add(ambient);
+  var sun = new THREE.DirectionalLight(0xffeedd, 1.0);
+  sun.position.set(25, 40, 20);
+  scene.add(sun);
+  var fill = new THREE.DirectionalLight(0x6688cc, 0.35);
+  fill.position.set(-20, 15, -25);
+  scene.add(fill);
+
+  // ---- Materials ----
+  var matStone  = new THREE.MeshLambertMaterial({ color: 0x9a9a8a });
+  var matBody   = new THREE.MeshLambertMaterial({ color: 0xb0482a });
+  var matBody2  = new THREE.MeshLambertMaterial({ color: 0xc25c36 });
+  var matRoof   = new THREE.MeshLambertMaterial({ color: 0x2b2f3a });
+  var matRoof2  = new THREE.MeshLambertMaterial({ color: 0x3a4152 });
+  var matSpire  = new THREE.MeshLambertMaterial({ color: 0xd4af37 });
+  var matDoor   = new THREE.MeshLambertMaterial({ color: 0x3a2415 });
+  var matGrass  = new THREE.MeshLambertMaterial({ color: 0x4f7a3a });
+
+  // ---- Voxel helper ----
+  function voxel(x, y, z, size, mat) {
+    var g = new THREE.BoxGeometry(size, size, size);
+    var m = new THREE.Mesh(g, mat);
+    m.position.set(x, y, z);
+    scene.add(m);
+    return m;
+  }
+
+  // ---- Ground ----
+  var ground = new THREE.Mesh(new THREE.BoxGeometry(120, 1, 120), matGrass);
+  ground.position.y = -0.5;
+  scene.add(ground);
+
+  // ---- Base platform ----
+  voxel(0, 0.5, 0, 21, matStone);
+  voxel(0, 1.5, 0, 17, matStone);
+  voxel(0, 2.4, 0, 13, matStone);
+  voxel(0, 1.2, 8.2, 3, matDoor);
+
+  // ---- Five tiers ----
+  var baseY = 3;
+  for (var i = 0; i < 5; i++) {
+    var w = 9 - i;
+    var y0 = baseY + i * 5;
+
+    voxel(0, y0 + 1.5, 0, w, i % 2 === 0 ? matBody : matBody2);
+    voxel(0, y0 + 2.0, w / 2, 2, matDoor);
+    voxel(0, y0 + 2.0, -w / 2, 2, matDoor);
+    voxel(0, y0 + 3.5, 0, w + 4, matRoof);
+    voxel(0, y0 + 4.5, 0, w + 2, matRoof2);
+  }
+
+  // ---- Spire (all pieces stacked with zero gap) ----
+  // Top of last upper roof (tier 4) is at y = 27.5 + 3.5 = 31
+  var spireBaseY = baseY + 25; // 28
+  voxel(0, spireBaseY + 4.0, 0, 2, matBody);    // drum: y 31–33
+  voxel(0, spireBaseY + 6.0, 0, 2, matSpire);   // collar: y 33–35
+  voxel(0, spireBaseY + 7.5, 0, 1.5, matSpire); // taper: y 34.75–36.25
+  voxel(0, spireBaseY + 8.5, 0, 1, matSpire);   // taper: y 36–37
+  voxel(0, spireBaseY + 9.5, 0, 1, matSpire);   // finial: y 37–38
+
+  // ---- Camera orbit ----
+  var focus = new THREE.Vector3(0, 14, 0);
+  var radius = 45;
+
+  function animate(t) {
+    requestAnimationFrame(animate);
+    var a = t * 0.0004;
+    camera.position.set(Math.cos(a) * radius, 22, Math.sin(a) * radius);
+    camera.lookAt(focus);
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(animate);
+
+  window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+</script>
+</body>
+</html>

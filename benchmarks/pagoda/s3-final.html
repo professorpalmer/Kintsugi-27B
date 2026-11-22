@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Voxel Pagoda</title>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; }
+  canvas { display: block; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+
+// ---------- Scene, camera, renderer ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87b5d9);
+scene.fog = new THREE.Fog(0x87b5d9, 60, 160);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ---------- Lighting ----------
+const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xfff2d0, 1.4);
+sun.position.set(30, 60, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -40;
+sun.shadow.camera.right = 40;
+sun.shadow.camera.top = 40;
+sun.shadow.camera.bottom = -40;
+scene.add(sun);
+
+const fill = new THREE.PointLight(0xffcc88, 0.6, 120);
+fill.position.set(-25, 25, -25);
+scene.add(fill);
+
+// ---------- Ground ----------
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x4c7a3f, roughness: 1 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---------- Voxel pagoda ----------
+const pagoda = new THREE.Group();
+scene.add(pagoda);
+
+const mats = {
+  stone:  new THREE.MeshStandardMaterial({ color: 0x9a938b, roughness: 0.9 }),
+  red:    new THREE.MeshStandardMaterial({ color: 0xb23a2a, roughness: 0.7 }),
+  roof:   new THREE.MeshStandardMaterial({ color: 0x4a2f1b, roughness: 0.8 }),
+  gold:   new THREE.MeshStandardMaterial({ color: 0xe8b54b, roughness: 0.35, metalness: 0.5 }),
+  door:   new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.9 })
+};
+
+function voxel(x, y, z, mat) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  pagoda.add(m);
+  return m;
+}
+
+// Solid square slab (all voxels filled)
+function slab(cx, cz, y, size, mat) {
+  for (let i = 0; i < size; i++)
+    for (let j = 0; j < size; j++)
+      voxel(cx - size / 2 + 0.5 + i, y, cz - size / 2 + 0.5 + j, mat);
+}
+
+// Hollow square ring, stacked `height` levels tall
+function ring(cx, cz, y, size, height, mat) {
+  for (let h = 0; h < height; h++) {
+    for (let i = 0; i < size; i++)
+      for (let j = 0; j < size; j++)
+        if (i === 0 || i === size - 1 || j === 0 || j === size - 1)
+          voxel(cx - size / 2 + 0.5 + i, y + h, cz - size / 2 + 0.5 + j, mat);
+  }
+}
+
+// Base platform (13x13) + stairs at the front
+slab(0, 0, 0, 13, mats.stone);
+for (let i = 0; i < 5; i++)
+  voxel(0, 0, 7 + i, mats.stone);
+// Corner pillars on the platform
+for (const sx of [-5, 5])
+  for (const sz of [-5, 5])
+    ring(sx, sz, 1, 1, 1, mats.stone);
+
+// Five tiers: body ring + overhanging roof slab + upturned corner eaves
+const tiers = [
+  { body: 7, height: 4, y: 1,  roof: 9 },
+  { body: 6, height: 4, y: 6,  roof: 8 },
+  { body: 5, height: 4, y: 11, roof: 7 },
+  { body: 4, height: 4, y: 16, roof: 6 },
+  { body: 3, height: 3, y: 21, roof: 5 }
+];
+
+for (const t of tiers) {
+  ring(0, 0, t.y, t.body, t.height, mats.red);
+  // doorway on the front of tier 1 and 3
+  if (t.y === 1 || t.y === 11)
+    for (let h = 0; h < t.height; h++)
+      voxel(0, t.y + h, t.body / 2, mats.door);
+
+  const roofY = t.y + t.height;
+  slab(0, 0, roofY, t.roof, mats.roof);
+  // Upturned eaves: corner voxels raised one step
+  const o = t.roof / 2;
+  voxel(-o, roofY + 1, -o, mats.roof);
+  voxel( o, roofY + 1, -o, mats.roof);
+  voxel(-o, roofY + 1,  o, mats.roof);
+  voxel( o, roofY + 1,  o, mats.roof);
+  // Gold finials on the eave corners
+  voxel(-o, roofY + 2, -o, mats.gold);
+  voxel( o, roofY + 2, -o, mats.gold);
+  voxel(-o, roofY + 2,  o, mats.gold);
+  voxel( o, roofY + 2,  o, mats.gold);
+}
+
+// Spire: tapering stack of gold cubes on top of the last roof
+let spireY = 25;
+for (let i = 0; i < 10; i++) {
+  const m = voxel(0, spireY, 0, mats.gold);
+  const s = 1 - i * 0.05;
+  m.scale.set(s, 1, s);
+  spireY++;
+}
+const orb = voxel(0, spireY, 0, mats.gold);
+orb.scale.set(1.4, 1, 1.4);
+
+// ---------- Orbiting camera ----------
+let angle = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  angle += 0.004;
+  const r = 32;
+  camera.position.set(Math.cos(angle) * r, 22, Math.sin(angle) * r);
+  camera.lookAt(0, 15, 0);
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
