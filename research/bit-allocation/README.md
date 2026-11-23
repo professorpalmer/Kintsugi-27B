@@ -137,7 +137,10 @@ and 110,992 tokens).
 | V3s2 + all attn_qkv | yes | wrong answer (2542) | -0.35 |
 
 - Two server starts of V3a gave the same margins to 0.000 nats: the engine path repeats exactly.
-- Every map with the ffn_up downgrades moves the first digit of vault 8 from +1.62 to about -1.6 / -2.1.
+- Every map in this table with the ffn_up downgrades moves the first digit of vault 8 from +1.62 to about -1.6 /
+  -2.1, or answers it wrong. One map with the same downgrades kept it: H1 (V3s2 + all 48 attn_qkv + ffn_gate 35-38,
+  +339 MiB) answered vault 8 right in its full G2 run (24/24 needles). Neither of H1's two added groups alone
+  repaired it on V3s2 (the last two rows). So the effect does not add; no vault 8 margin run of H1 exists.
 - `_check_tzname` sits near the edge on V3a itself (+0.43). We wrote the rule before these numbers: an item with a
   V3a margin under 1.0 is fragile, and its flips make no rule.
 
@@ -154,8 +157,8 @@ and 110,992 tokens).
   items are easy for V3a (min margins 2.4-7.2 nats on W1, >= 5.04 on W2). **G2 is required for every map**; the wide
   probes only add to it.
 - V5b has the ffn_up downgrade of layers 4-15 and keeps vault 8 (+2.37). So the vault-8 loss sits in the ffn_up
-  downgrades of layers **21-47** (a sign from one map, not a proof). Every map with them lost vault 8; every map
-  without them kept it.
+  downgrades of layers **21-47** (a sign from one map, not a proof). Every map with them lost vault 8 except H1 (see
+  the bisection above), and every map without them kept it.
 
 **V5bc-h32 (V5b with the release head) against the release V3ac-h32:**
 
@@ -225,7 +228,12 @@ repeats exactly for one seed and one host type.
 3. **KL or NLL by depth band does not stand in for retrieval.** Retrieval needs its own gate.
 4. **Recall probes need hard items.** Easy items (high margins on the reference) cannot see a recall loss. Margins on
    the exact gate prompt are a fast and exact stand-in for a greedy answer.
-5. **The ffn_up of layers 21-47 carries recall.** Every map that put them at K2 lost the same 117k needle.
+5. **One 117k needle traces to the ffn_up of layers 21-47, but that is one item, not "recall".** Every map that put
+   them at K2 lost that needle except one, which also had +339 MiB in two other groups (H1). On a later held-out test
+   with 20 documents, 480 recall items and a short-distance control (the paper, Section 4.1, B1), one map with this
+   change lost long-range recall margin and another stayed inside the noise floor; the uniform baseline, which holds
+   these up-projections at 2 bits, had more margin on this needle than the shipped map. We do not claim that this
+   band holds long-range recall.
 6. **HumanEval is at its ceiling.** All our files scored 158-162 of 164, with a spread of up to 3 problems between
    runs of one file. We use it as a health gate (>= 158), not to rank files.
 7. **Write the line before the run, and keep it.** Two lines were wrong on first use (a capped margin score, a class
