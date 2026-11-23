@@ -10,7 +10,7 @@ the same for every version below: when a new bundle comes out, download only the
 - **Launcher only: which setting to lower when the VRAM is short.** When you set `KINTSUGI_CELLS` by hand and the
   value is higher than this card can hold with the drafting mode, the launcher prints the safe maximum (its own count
   for this card, this mode and the VRAM in use) and what to do: "lower KINTSUGI_CELLS to N, or set KINTSUGI_DRAFT=mtp".
-  It keeps your value. A user reported an RTX 3080 Ti 12 GB with a display on the card (329 MiB in use before the
+  It keeps your value. Amel (@donamelo) reported an RTX 3080 Ti 12 GB with a display on the card (329 MiB in use before the
   start) and 83,712 cells set by hand: with DFlash2 the first prompt read failed ("failed to allocate compute pp
   buffers"). On a rented RTX 3080 Ti with 328 MiB held we got the same failure; the safe maximum there is 64,000 cells
   with DFlash2 (42,752 with the display margin) and 118,016 with MTP.

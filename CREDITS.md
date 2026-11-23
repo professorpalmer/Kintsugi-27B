@@ -95,6 +95,10 @@ measurements.
 - **AMD (ROCm 7.14, TheRock)**: the ROCm runtime and libraries in `bin/` (their licence texts are in
   `licenses/rocm/`).
 
+## Reports and tests
+
+- **Amel ([@donamelo](https://github.com/donamelo))**: DFlash2 VRAM reports on RTX 3080 Ti with exact settings and logs (v1.1.3 and v1.1.4).
+
 ## Citations
 
 DFlash 2 (Inco AI, 2026, https://inco.ai/blog/dflash2/) and DFlash: Block Diffusion for Flash Speculative Decoding
