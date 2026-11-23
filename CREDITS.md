@@ -78,6 +78,23 @@ Cary Palmer ([professorpalmer](https://github.com/professorpalmer)): the fits, t
 the engine port and kernels, the tiered K/V cache, the two-stage head, the launcher, the tool layer, and the
 measurements.
 
+## AMD (ROCm / HIP) builds
+
+- **Lazm**: the first Linux RDNA3 test (RX 7900 XTX). He found the RDNA GEMV trap and its source line.
+- **Abdelrahman Waref (@awaref95)**: the first Windows RDNA3 test (RX 7900 XTX,
+  amd-test-win1: KL -0.15 % against our CUDA engine, all checks PASS).
+- **turboderp (exllamav3)**: the ROCm port of the EXL3 kernels: the emulated tensor-core fragments (`ptx_rocm.cuh`)
+  and the native RDNA GEMV kernels (the one-row kernel and the multi-row core), MIT.
+- **Piotr Wilkin (ilintar), with Johannes Gäßler**: WMMA flash attention for head size 256 on RDNA
+  (ggml-org/llama.cpp #28102); a test switch in the AMD builds.
+- **fox5611**: the fixed hipBLAS workspace (ggml-org/llama.cpp #31838); a test switch in the AMD builds.
+- **Aman Gupta and gianni-cor (Tether, qvac-fabric), with the ggml authors**: the chunked GDN kernel
+  (ggml-org/llama.cpp #29353), which also has an RDNA3 form; a test switch on RDNA3 in the AMD builds.
+- **Niko1221 (Strata)**: what Strata's HIP builds show about how to ship ROCm on Windows (the DLLs next to the engine,
+  the WDDM memory budget). Ideas only, no code (MIT).
+- **AMD (ROCm 7.14, TheRock)**: the ROCm runtime and libraries in `bin/` (their licence texts are in
+  `licenses/rocm/`).
+
 ## Citations
 
 DFlash 2 (Inco AI, 2026, https://inco.ai/blog/dflash2/) and DFlash: Block Diffusion for Flash Speculative Decoding
