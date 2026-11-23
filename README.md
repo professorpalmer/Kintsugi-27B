@@ -3,7 +3,7 @@
 Kintsugi-27B is Qwen3.8-27B at 2.47 bits per weight, made to run on one 12 GB NVIDIA card with the full
 262,144-token context. It comes as a model file and a Windows bundle (engine, launcher, saved-chat layer).
 
-**The method behind it:** the paper "Kintsugi: Find and Repair Quantization Damage Where Tasks Break, Not Where Averages Look", with the evidence and the scripts to recompute every number: [github.com/professorpalmer/kintsugi-method](https://github.com/professorpalmer/kintsugi-method) (DOI [10.5281/zenodo.24455576](https://doi.org/10.5281/zenodo.24455576)).
+**The method behind it:** the paper "Kintsugi: Find and Repair Quantization Damage Where Tasks Break, Not Where Averages Look", with the evidence and the scripts to recompute every number: [github.com/professorpalmer/kintsugi-method](https://github.com/professorpalmer/kintsugi-method) (DOI [10.5281/zenodo.24455575](https://doi.org/10.5281/zenodo.24455575)).
 
 Built on: the **L0xRE-V2 bit allocation** by YourHighnessLA (used unchanged), the **Escha W2 format** by Escha Labs,
 and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: [CREDITS.md](CREDITS.md).
