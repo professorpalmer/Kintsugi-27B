@@ -16,6 +16,7 @@ Third-party software in this bundle:
    - the EXL3 trellis kernels from exllamav3 (turboderp), MIT License, Copyright (c) 2025 Turboderp.
      Full text: licenses/LICENSE-exllamav3.
    - the web chat page (llama.cpp's tools/ui, MIT), built from that source and embedded in the server.
+     The npm code in it, with each licence and copyright text: licenses/web-ui-THIRD-PARTY.txt.
    - cpp-httplib (Yuji Hirose, MIT), nlohmann/json (Niels Lohmann, MIT), and the hash and other vendored components of
      llama.cpp under their own licences: licenses/vendor/.
    The fork's changes (the Escha / EXL3 trellis op, the tiered K/V cache, the two-stage output head, background saves,
