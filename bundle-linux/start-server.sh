@@ -225,6 +225,26 @@ if [ "$CELLS" -lt "$CTX" ] && [ $((CTX % 32768)) -ne 0 ]; then
   CELLS="$(pick CELLS "$(cells_for $FIXED)")"; [ "$CELLS" -gt "$CTX" ] && CELLS=$CTX
 fi
 [ "$CELLS" -le 3328 ] && echo "note   only $CELLS K/V cells fit in VRAM: decode reads most of the K/V cache from system RAM (close other programs that use the card)"
+# ---- Hand-set cells: the launcher's own count for this card and drafting mode is the safe maximum. Past it, the first
+# ---- prompt read can fail with "out of memory" (RTX 3080 Ti with a display, DFlash2, 83,712 cells set by hand: about
+# ---- 700 MiB too many). The launcher keeps the value that you set and tells you which setting to lower.
+OWN_CELLS=$(cells_for $FIXED)
+OWN_MTP=$OWN_CELLS
+if [ "$MODE" = dflash ]; then
+  G0=$GROWTH; GROWTH=$((GROWTH - 128)); OWN_MTP=$(cells_for $((FIXED - DRAFTER_MIB))); GROWTH=$G0
+fi
+lower_line() {   # lower_line: which setting to lower, for this card and drafting mode
+  if [ "$MODE" = dflash ]; then
+    echo "lower KINTSUGI_CELLS to $OWN_CELLS, or set KINTSUGI_DRAFT=mtp (MTP + lookup: at most $OWN_MTP cells)"
+  else
+    echo "lower KINTSUGI_CELLS to $OWN_CELLS"
+  fi
+}
+if [ -n "$(pick CELLS '')" ] && [ "$CELLS" -gt "$OWN_CELLS" ]; then
+  case "$MODE" in dflash) M_TXT="DFlash2 drafting" ;; mtp) M_TXT="MTP + lookup drafting" ;; *) M_TXT="no drafting" ;; esac
+  echo "WARN   KINTSUGI_CELLS=$CELLS is more than this card can hold with $M_TXT: the safe maximum is $OWN_CELLS cells (free $((TOTAL - USED)) MiB, ceiling $CEILING, margin $MARGIN). A prompt read can fail with \"out of memory\"."
+  echo "       To fix it: $(lower_line). The launcher keeps your value."
+fi
 
 # ---- Drafting arguments ----------------------------------------------------------------------------------------------
 DRAFT=0; [ "$MODE" = mtp ] && DRAFT=$MTP_DRAFT; [ "$MODE" = dflash ] && DRAFT=7
@@ -333,19 +353,23 @@ if [ $USE_LAYER = 1 ]; then
 fi
 echo "stop   $ROOT/stop.sh"
 alive() { kill -0 "$1" 2> /dev/null; }
+stop_both() {   # stop the server and the layer, then wait until they are gone
+  local x i
+  for x in ${LP:-} $SP; do alive "$x" && kill "$x" 2> /dev/null; done
+  for i in $(seq 1 30); do alive "$SP" || { [ -n "${LP:-}" ] && alive "$LP"; } || break; sleep 1; done
+  for x in ${LP:-} $SP; do alive "$x" && kill -9 "$x" 2> /dev/null; done
+}
 # DFlash2 -> MTP, once: when DFlash2 was chosen automatically (KINTSUGI_DRAFT=auto) and the server stops during the load
 # or the warm-up request fails, keep that log, stop the server (and the layer) and start again with MTP + lookup
 # drafting. KINTSUGI_DRAFT=dflash fails instead. Only with --wait (the warm-up needs it).
 retry_mtp() {   # retry_mtp <why>: returns only when no retry applies
   [ "$MODE" = dflash ] && [ "$DRAFT_SET" = auto ] && [ -z "${KINTSUGI_DFLASH_RETRIED:-}" ] || return 0
-  local fail="${LOG%.log}.dflash-failed.log" x i u
+  local fail="${LOG%.log}.dflash-failed.log" i u
   cp -f "$LOG" "$fail" 2> /dev/null
   echo "note   DFlash2 start failed ($1): starting again once with MTP + lookup drafting (KINTSUGI_DRAFT=mtp skips DFlash2)."
   echo "       Please report it with your card, driver and the log $fail at https://github.com/professorpalmer/Kintsugi-27B/issues"
   grep -a -i -E "out of memory|cudaMalloc|failed to allocate|CUDA error|error|failed|abort" "$LOG" 2> /dev/null | tail -6 | cut -c1-240 | sed "s/^/  log  /"
-  for x in ${LP:-} $SP; do alive "$x" && kill "$x" 2> /dev/null; done
-  for i in $(seq 1 30); do alive "$SP" || { [ -n "${LP:-}" ] && alive "$LP"; } || break; sleep 1; done
-  for x in ${LP:-} $SP; do alive "$x" && kill -9 "$x" 2> /dev/null; done
+  stop_both
   # the driver frees the memory of a stopped process a moment later; the cell count of the retry reads the free VRAM
   for i in $(seq 1 20); do
     u=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -1 | tr -dc '0-9')
@@ -367,9 +391,11 @@ AUTH=(); [ -n "$KEY_FILE" ] && AUTH=(-H "Authorization: Bearer $(tr -d '\r\n' < 
 for i in $(seq 1 150); do
   if curl -sf -m 3 "http://127.0.0.1:$PORT/health" > /dev/null 2>&1; then
     M="$(no_gpu_message "$LOG")"; [ -n "$M" ] && stop_no_gpu "$M"
-    # Warm-up request (about 1,100 tokens in, 8 out): the engine takes its first-use memory now, so the VRAM printed
-    # below is the peak, and a shortage shows here and not later.
-    TEXT="$(for n in $(seq 1 110); do printf 'Entry %d of the log has nothing to report. ' "$n"; done)"
+    # Warm-up request (about 1,340 tokens in, 8 out; more with KINTSUGI_UB above 1024, so that the prompt fills one full
+    # micro-batch): the engine takes its first-use memory and its prompt-read buffers now, so the VRAM printed below is
+    # the peak, and a shortage shows here and not at the first request.
+    NWARM=$((UB / 11 + 16)); [ "$NWARM" -lt 110 ] && NWARM=110
+    TEXT="$(for n in $(seq 1 $NWARM); do printf 'Entry %d of the log has nothing to report. ' "$n"; done)"
     BODY="{\"model\":\"warmup\",\"max_tokens\":8,\"temperature\":0,\"cache_prompt\":false,\"chat_template_kwargs\":{\"enable_thinking\":false},\"messages\":[{\"role\":\"user\",\"content\":\"${TEXT}Say OK.\"}]}"
     T0=$(date +%s.%N)
     WARM_OK=1
@@ -377,7 +403,19 @@ for i in $(seq 1 150); do
     sleep 0.5
     if [ $WARM_OK = 0 ] || ! alive "$SP"; then
       if alive "$SP"; then retry_mtp "the warm-up request failed"; else retry_mtp "the server stopped during the warm-up request"; fi
+      OOM=0; grep -a -q -i -E "out of memory|failed to allocate" "$LOG" 2> /dev/null && OOM=1
+      if [ "$MODE" = dflash ] && [ "$DRAFT_SET" = dflash ]; then
+        # KINTSUGI_DRAFT=dflash: no fallback to MTP and no "ready"; keep the log, stop the server, exit 1
+        FAIL="${LOG%.log}.dflash-failed.log"; cp -f "$LOG" "$FAIL" 2> /dev/null
+        echo "note   the warm-up request failed with KINTSUGI_DRAFT=dflash (no fallback to MTP when DFlash2 is set). Log kept: $FAIL"
+        grep -a -i -E "out of memory|cudaMalloc|failed to allocate|CUDA error|error|failed|abort" "$LOG" 2> /dev/null | tail -6 | cut -c1-240 | sed "s/^/  log  /"
+        [ $OOM = 1 ] && echo "VRAM   the server is short of VRAM with DFlash2 (out of memory). To fix it: $(lower_line)."
+        stop_both
+        echo "stopped: the server is not ready (the server and the layer are stopped)"
+        exit 1
+      fi
       echo "note   the warm-up request failed"
+      [ $OOM = 1 ] && echo "VRAM   the server is short of VRAM (out of memory in $LOG): requests will fail. Stop it ($ROOT/stop.sh), then $(lower_line)."
       alive "$SP" || { echo "server stopped after the warm-up request: see $LOG"; exit 1; }
     fi
     T1=$(date +%s.%N)

@@ -255,6 +255,18 @@ function Test-MtpRetry($why) {
         $Cells = [int](Pick 'CELLS' (CellsFor $Fixed)); if ($Cells -gt $Ctx) { $Cells = $Ctx }
     }
     if ($Cells -le 3328) { Write-Host "note   only $Cells K/V cells fit in VRAM: decode reads most of the K/V cache from system RAM (close other programs that use the card)" }
+    # ---- Hand-set cells: the launcher's own count for this card and drafting mode is the safe maximum. Past it, the first
+    # ---- prompt read can fail with "out of memory" (RTX 3080 Ti with a display, DFlash2, 83,712 cells set by hand: about
+    # ---- 700 MiB too many). The launcher keeps the value that you set and tells you which setting to lower.
+    $OwnCells = [int](CellsFor $Fixed)
+    $OwnMtp = $OwnCells
+    if ($Mode -eq 'dflash') { $g0 = $Growth; $Growth = $Growth - 128; $OwnMtp = [int](CellsFor ($Fixed - $DrafterMiB)); $Growth = $g0 }
+    $LowerLine = if ($Mode -eq 'dflash') { "lower KINTSUGI_CELLS to $OwnCells, or set KINTSUGI_DRAFT=mtp (MTP + lookup: at most $OwnMtp cells)" } else { "lower KINTSUGI_CELLS to $OwnCells" }
+    if ((Pick 'CELLS' '') -and $Cells -gt $OwnCells) {
+        $ModeTxt = if ($Mode -eq 'dflash') { 'DFlash2 drafting' } elseif ($Mode -eq 'mtp') { 'MTP + lookup drafting' } else { 'no drafting' }
+        Write-Host "WARN   KINTSUGI_CELLS=$Cells is more than this card can hold with $ModeTxt`: the safe maximum is $OwnCells cells (free $($TotalMiB - $UsedMiB) MiB, ceiling $Ceiling, margin $Margin). A prompt read can fail with `"out of memory`"."
+        Write-Host "       To fix it: $LowerLine. The launcher keeps your value."
+    }
 
     # ---- Drafting: the model's own MTP block (draft 3) + lookup drafting out of the prompt -----------------------------------
     $Draft = if ($Mode -eq 'mtp') { $MtpDraft } elseif ($Mode -eq 'dflash') { 7 } else { 0 }
@@ -381,9 +393,11 @@ function Test-MtpRetry($why) {
             try { $up = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 "http://127.0.0.1:$Port/health").StatusCode -eq 200 } catch { }
             if ($up) {
                 $m = Get-NoGpuMessage $log; if ($m) { Stop-NoGpu $m }
-                # Warm-up request (about 1,100 tokens in, 8 out): the engine takes its first-use memory now, so the VRAM printed
-                # below is the peak, and a shortage shows here and not later.
-                $text = (1..110 | ForEach-Object { "Entry $_ of the log has nothing to report." }) -join ' '
+                # Warm-up request (about 1,340 tokens in, 8 out; more with KINTSUGI_UB above 1024, so that the prompt fills one
+                # full micro-batch): the engine takes its first-use memory and its prompt-read buffers now, so the VRAM printed
+                # below is the peak, and a shortage shows here and not at the first request.
+                $nWarm = [math]::Max(110, [math]::Floor($Ub / 11) + 16)
+                $text = (1..$nWarm | ForEach-Object { "Entry $_ of the log has nothing to report." }) -join ' '
                 $body = @{ model = 'warmup'; max_tokens = 8; temperature = 0; cache_prompt = $false
                            chat_template_kwargs = @{ enable_thinking = $false }
                            messages = @(@{ role = 'user'; content = "$text Say OK." }) } | ConvertTo-Json -Depth 5
@@ -396,7 +410,23 @@ function Test-MtpRetry($why) {
                 Start-Sleep -Milliseconds 500
                 if (-not $WarmErr -and $p.HasExited) { $WarmErr = 'the server stopped during the warm-up request' }
                 if ($WarmErr -and (Test-MtpRetry "the warm-up request failed: $WarmErr")) { continue launch }
+                $Oom = $false
+                if ($WarmErr) { $Oom = [bool](Select-String -Path $log -Pattern 'out of memory|failed to allocate' -Quiet -ErrorAction SilentlyContinue) }
+                if ($WarmErr -and $Mode -eq 'dflash' -and $DraftSet -eq 'dflash') {
+                    # KINTSUGI_DRAFT=dflash: no fallback to MTP and no "ready"; keep the log, stop the server, exit 1
+                    $failLog = $log -replace '\.log$', '.dflash-failed.log'
+                    Copy-Item -LiteralPath $log -Destination $failLog -Force -ErrorAction SilentlyContinue
+                    Write-Host "note   the warm-up request failed with KINTSUGI_DRAFT=dflash (no fallback to MTP when DFlash2 is set): $WarmErr. Log kept: $failLog"
+                    @(Select-String -Path $log -Pattern 'out of memory|cudaMalloc|failed to allocate|CUDA error|error|failed|abort' -ErrorAction SilentlyContinue) |
+                        Select-Object -Last 6 | ForEach-Object { Write-Host "  log  $($_.Line.Trim())" }
+                    if ($Oom) { Write-Host "VRAM   the server is short of VRAM with DFlash2 (out of memory). To fix it: $LowerLine." }
+                    foreach ($x in @($lp, $p)) {
+                        if ($x -and -not $x.HasExited) { Stop-Process -Id $x.Id -Force -ErrorAction SilentlyContinue; try { $x.WaitForExit(30000) | Out-Null } catch { } }
+                    }
+                    Write-Host "stopped: the server is not ready (the server and the layer are stopped)"; exit 1
+                }
                 if ($WarmErr) { Write-Host "note   the warm-up request failed: $WarmErr" }
+                if ($Oom) { Write-Host "VRAM   the server is short of VRAM (out of memory in $log): requests will fail. Stop it (stop.ps1), then $LowerLine." }
                 if ($p.HasExited) { Write-Host "server stopped after the warm-up request: see $log"; exit 1 }
                 $vram = [int]((& nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits) | Select-Object -First 1)
                 # Spill check: the server's dedicated GPU memory against what the card holds. More in the process than on the

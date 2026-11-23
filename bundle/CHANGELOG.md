@@ -5,6 +5,28 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.1.4 (2026-11-23)
+
+- **Launcher only: which setting to lower when the VRAM is short.** When you set `KINTSUGI_CELLS` by hand and the
+  value is higher than this card can hold with the drafting mode, the launcher prints the safe maximum (its own count
+  for this card, this mode and the VRAM in use) and what to do: "lower KINTSUGI_CELLS to N, or set KINTSUGI_DRAFT=mtp".
+  It keeps your value. A user reported an RTX 3080 Ti 12 GB with a display on the card (329 MiB in use before the
+  start) and 83,712 cells set by hand: with DFlash2 the first prompt read failed ("failed to allocate compute pp
+  buffers"). On a rented RTX 3080 Ti with 328 MiB held we got the same failure; the safe maximum there is 64,000 cells
+  with DFlash2 (42,752 with the display margin) and 118,016 with MTP.
+- **`KINTSUGI_DRAFT=dflash` and a failed warm-up:** the launcher now prints the error lines (and, for out of memory,
+  the setting to lower), keeps the log as `logs/server-<port>.dflash-failed.log`, stops the server and the layer, and
+  exits with code 1. It no longer says "ready" for a server that cannot read a prompt. With `KINTSUGI_DRAFT=auto` the
+  v1.1.3 fallback to MTP stays.
+- **Warm-up:** with `KINTSUGI_UB` above 1024, the warm-up prompt is longer, so that it fills one full micro-batch and a
+  shortage shows at the start. At the default (1024) it does not change (1,337 tokens).
+- Checks: the launchers print the same settings and server command as v1.1.3 in every drafting mode (Windows and
+  Linux); the start cases (defaults, too many cells with dflash and with auto, MTP, cells under the maximum, and the
+  v1.1.3 fallback cases) pass on an RTX 4070 with Windows and on an RTX 3080 Ti with Linux, and again from the
+  release zip and tarball, with no server or layer left running after each. On Windows, too many cells did not fail:
+  the driver moved 9 MiB to system RAM and the launcher printed its SPILL line. The engine and the model file do not
+  change: download only the new zip or tarball.
+
 ## v1.1.3 (2026-11-22)
 
 - **Launcher only: DFlash2 falls back to MTP once.** When the launcher picks the DFlash2 drafter by itself (the drafter
