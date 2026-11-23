@@ -81,7 +81,7 @@ measurements.
 ## AMD (ROCm / HIP) builds
 
 - **Lazm**: the first Linux RDNA3 test (RX 7900 XTX). He found the RDNA GEMV trap and its source line.
-- **Abdelrahman Waref (@awaref95)**: the first Windows RDNA3 test (RX 7900 XTX,
+- **Abdelrahman Waref ([awaref.me](https://awaref.me/))**: the first Windows RDNA3 test (RX 7900 XTX,
   amd-test-win1: KL -0.15 % against our CUDA engine, all checks PASS).
 - **turboderp (exllamav3)**: the ROCm port of the EXL3 kernels: the emulated tensor-core fragments (`ptx_rocm.cuh`)
   and the native RDNA GEMV kernels (the one-row kernel and the multi-row core), MIT.
