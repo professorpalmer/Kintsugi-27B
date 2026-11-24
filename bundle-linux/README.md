@@ -1,4 +1,4 @@
-# Kintsugi-27B v1.1.4 for Linux (x86_64, RTX 20 / 30 / 40 / 50 and H100, 12 GB)
+# Kintsugi-27B v1.1.5 for Linux (x86_64, RTX 20 / 30 / 40 / 50 and H100, 12 GB)
 
 These are the text files of the Linux tarball; download the tarball from
 [Releases](https://github.com/professorpalmer/Kintsugi-27B/releases/latest). The tarball also holds the engine
@@ -101,6 +101,36 @@ to disk after each answer, so after a restart the next turn of that chat starts 
 Settings are environment variables, for example `KINTSUGI_CTX=131072 ./start-server.sh --wait`. The list is at the
 top of `start-server.sh`. By default only this computer can connect; `KINTSUGI_HOST=0.0.0.0` opens it to your network:
 then also set `KINTSUGI_KEY_FILE` to a file holding an API key. Logs are in `logs/`.
+
+## What to send back
+
+Copy this into a GitHub issue and fill it in:
+
+```
+Card and VRAM (nvidia-smi):
+Display on this card (yes / no):
+Driver version (nvidia-smi, top line):
+Linux: distribution and version, kernel (uname -r), glibc (ldd --version, first line):
+CPU and system RAM (free -g):
+Python for saved chats (python3 --version, or no):
+Kintsugi-27B version (the tarball name) and drafter (DFlash2 file there: yes / no):
+
+From the start output (./start-server.sh --wait):
+  the "kv" line (kv q4_0, tiered: cells ...):
+  the "warm" line (VRAM ... MiB):
+  any "note", "WARN" or "SPILL" line:
+
+Speed (logs/server-8080.log has lines like "eval time = ... tokens per second"):
+  a short chat (under 4k tokens):        tok/s
+  around 32k tokens of context:          tok/s
+  around 128k tokens (if you tried):     tok/s
+  the longest you tried (how many tokens, how fast):
+
+Errors (the exact text, and the last 30 lines of logs/server-8080.log and logs/layer-8080.log;
+for example: tail -n 30 logs/server-8080.log):
+
+How the answers felt (long-document answers, chat after a restart, code, tools):
+```
 
 ## Known limits
 

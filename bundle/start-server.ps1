@@ -32,6 +32,8 @@
 #   KINTSUGI_SLOT_SAVE_PATH  folder of the saved conversations (default slots\ in this folder)
 #   KINTSUGI_SLOT_CACHE_GB   size limit of that folder in GB (default 20; the oldest files are removed past it)
 #   KINTSUGI_UB            micro-batch for prompt reads (default 1024; 512 saves about 146 MiB and reads 8-13 % slower)
+#   KINTSUGI_ALIAS         the model name that /v1/models lists and replies carry (default kintsugi; an --alias in
+#                          KINTSUGI_EXTRA wins)
 #   KINTSUGI_EXTRA         more llama-server arguments
 #   KINTSUGI_CHAT_TEMPLATE chat template file (default templates\kintsugi.jinja: the model's template, except that a
 #                          system message after the first turn, as Claude Code sends, is accepted); "model" = the
@@ -53,6 +55,14 @@ function Get-NoGpuMessage($LogPath) {
         return "the engine could not use the GPU (see $LogPath): update the NVIDIA driver to 580 or newer"
     }
     $null
+}
+# The server stopped during the load: stop the layer too (no layer with no server behind it), print the last lines of the
+# server log, exit 1.
+function Stop-LoadFailed {
+    if ($lp -and -not $lp.HasExited) { Stop-Process -Id $lp.Id -Force -ErrorAction SilentlyContinue; try { $lp.WaitForExit(10000) | Out-Null } catch { } }
+    Write-Host "server stopped during load: see $log"
+    Get-Content -LiteralPath $log -Tail 3 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
+    exit 1
 }
 function Stop-NoGpu($Message) {
     if ($p) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
@@ -346,6 +356,9 @@ function Test-MtpRetry($why) {
         if ($Vision -eq 'cpu') { $SrvArgs += '--no-mmproj-offload' }
     }
     $Extra = Pick 'EXTRA' ''
+    # The model name clients see (/v1/models, the "model" of each reply): "kintsugi", not the model file's path.
+    $Alias = Pick 'ALIAS' 'kintsugi'
+    if (" $Extra " -notmatch '\s(--alias|-a)\s') { $SrvArgs += @('--alias', $Alias) }
     if ($Extra) { $SrvArgs += $Extra.Split(' ') }
 
     Write-Host "Kintsugi-27B"
@@ -386,6 +399,7 @@ function Test-MtpRetry($why) {
             Start-Sleep 1
         }
         $m = Get-NoGpuMessage $log; if ($m) { Stop-NoGpu $m }
+        if ($p.HasExited) { Stop-LoadFailed }
     }
     if ($Wait) {
         for ($i = 0; $i -lt 150; $i++) {
@@ -443,7 +457,7 @@ function Test-MtpRetry($why) {
             }
             if ($p.HasExited) { $m = Get-NoGpuMessage $log; if ($m) { Stop-NoGpu $m }
                 if (Test-MtpRetry 'the server stopped during the load') { continue launch }
-                Write-Host "server stopped during load: see $log"; exit 1 }
+                Stop-LoadFailed }
             if ($lp -and $lp.HasExited) { Write-Host "layer stopped: see $layerLog"; exit 1 }
             Start-Sleep 2
         }
