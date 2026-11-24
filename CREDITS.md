@@ -84,7 +84,8 @@ measurements.
 - **Abdelrahman Waref ([awaref.me](https://awaref.me/))**: the first Windows RDNA3 test (RX 7900 XTX,
   amd-test-win1: KL -0.15 % against our CUDA engine, all checks PASS).
 - **turboderp (exllamav3)**: the ROCm port of the EXL3 kernels: the emulated tensor-core fragments (`ptx_rocm.cuh`)
-  and the native RDNA GEMV kernels (the one-row kernel and the multi-row core), MIT.
+  and the native RDNA GEMV kernels (the one-row kernel, the multi-row core, and in amd-test-5 the "tiles" core,
+  the multi-row design and the fused rotation epilogue), MIT.
 - **Piotr Wilkin (ilintar), with Johannes Gäßler**: WMMA flash attention for head size 256 on RDNA
   (ggml-org/llama.cpp #28102); a test switch in the AMD builds.
 - **fox5611**: the fixed hipBLAS workspace (ggml-org/llama.cpp #31838); a test switch in the AMD builds.

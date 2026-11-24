@@ -1,6 +1,6 @@
 ---
 name: AMD test result
-about: Results of an AMD test build (pre-release amd-test-3, or an earlier amd-test) on your Radeon card
+about: Results of an AMD test build (pre-release amd-test-5, or an earlier amd-test) on your Radeon card
 title: "AMD test: <your card> on <Windows or your Linux>"
 labels: amd-test
 ---
@@ -14,8 +14,8 @@ Thank you for testing. The self-test report is the most useful part: paste ALL o
 **Which file** (the zip or tarball name):
 
 **Self-test report** (Windows: double-click `selftest.cmd`; Linux: `./selftest.sh`. Paste the whole block from
-"==== Kintsugi-27B AMD self-test report" to "==== end of report ====", with the "7 table", "7 screen" and
-"7 profile" lines):
+"==== Kintsugi-27B AMD self-test report" to "==== end of report ====", with the "7 ..." lines and the
+"8 ..." lines of the bandwidth meter):
 
 ```
 paste the report block here
