@@ -46,6 +46,14 @@ the same computation as a session that never left memory, also when several conv
 exact: at the next turn of the conversation, its last save after an answer must be a token prefix of the new prompt.
 When it is not (the template or the client rewrites the answer), the conversation goes back to the save before the
 request. Without delta support the cached-token test above is used.
+First save (BONSAI_SLOT_CACHE_FIRST, default 1; 0 = off): a new long conversation (no test result yet, no saved prefix)
+also saves BEFORE its first request: the prefill-only read (the read the request would do), then a background save,
+then the request. Whether the client sends the reasoning back is not known at the first turn; when it does not, the
+save after the answer is never a prefix of the next turn, and without this save a restart before the third turn read
+the whole conversation again (Kintsugi-27B #15). The save after the answer is then a delta of this save. When a
+conversation fails the exact test, its saves after an answer that are not a token prefix of the new prompt are removed
+at once (they can not be restored for it; #12), and a conversation that failed the test gets no idle full save (that
+save holds the state after an answer, and it replaced the chain of useful saves).
 Read ahead (T1-d): a chat request with "prefill_only": true reads and saves its prompt and returns no text; the later real
 request then restores it.
 Any failure here only logs and lets the request run as before.
@@ -108,6 +116,10 @@ def has_media(body):
     return False
 
 
+class _Pending(Exception):
+    """before(): the save runs in the background; the thread indexes it."""
+
+
 class SlotCache:
     def __init__(self, upstream, folder, min_tokens=16384, grow=8192, budget_gb=20.0, log=None, min_gain=2048, after=False,
                  chain=0, chain_max=None, idle_s=30.0, every=True, protect_s=600.0):
@@ -125,6 +137,8 @@ class SlotCache:
         self.delta_ok = None           # the server takes "pos_min" / "append" (GET /props slot_save_delta); None: not asked
         self.async_ok = None           # the server takes "async": true for saves (GET /props slot_save_async); None: not asked
         self.async_on = os.environ.get("BONSAI_SLOT_SAVE_ASYNC", "1") != "0"   # background saves after the answer
+        self.first_on = os.environ.get("BONSAI_SLOT_CACHE_FIRST", "1") != "0"   # a new conversation also saves before its first request
+        self.before_bg = None          # the thread of a background save before a request (wait_before joins it)
         self.tmp_n = 0                 # a new temp name for each save (a background save may still be in flight)
         self.min_gain = int(min_gain)   # restore only when it saves at least this many tokens of reading (~15-25 s at depth)
         self.min_tokens, self.grow, self.budget = int(min_tokens), int(grow), float(budget_gb) * 2**30
@@ -210,6 +224,10 @@ class SlotCache:
                 elif os.path.exists(self._bin(sha)):
                     self.index[sha] = {"n": int(e["n"]), "last": float(e["last"]), "bytes": int(e["bytes"]),
                                        "parent": e.get("parent"), "depth": int(e.get("depth") or 0)}
+                    if e.get("key"):     # the conversation, and whether the save holds the state after an answer
+                        self.index[sha]["key"] = str(e["key"])
+                    if e.get("after"):
+                        self.index[sha]["after"] = True
             except Exception:
                 continue
         # a delta whose chain lost a file is no use: drop it (its files go in _clean)
@@ -243,6 +261,9 @@ class SlotCache:
         now = time.time() if now is None else now
         if not self.compact or self.busy or now - self.t_active < self.idle_s:
             return None
+        if self.conv.get(self.compact[0]) is False:   # the client rewrites the answers: the state after an answer is
+            self.compact = None                       # no prefix of the next turn, and it would replace the useful chain
+            return None
         if not self.lock.acquire(blocking=False):
             return None
         if not self.compact or self.busy:   # review: a request may have started between the check and the lock
@@ -271,7 +292,7 @@ class SlotCache:
                 tipt = self._toks_of(tip) if old_chain else []
             except Exception:   # an unreadable token list: keep the old chain (eviction removes it later)
                 old_chain, tipt = None, []
-            sha, size = self._store(tmp, saved)
+            sha, size = self._store(tmp, saved, after=True)
             if old_chain and (tip == sha or saved[:tipn] == tipt):   # the full save holds every token of the old chain
                 self._drop([x for x in old_chain if x != sha], "replaced (idle full save)")
             self._add_tip(key, sha)
@@ -468,7 +489,7 @@ class SlotCache:
         per-request counts, which it resets)."""
         return int(self._get("/slots", auth)[0].get("n_prompt_tokens") or 0)
 
-    def _store(self, tmp, saved, parent=None):
+    def _store(self, tmp, saved, parent=None, after=False):
         """Give a finished save in tmp (+ its .draft sidecar) its final name and index entry; returns (sha, bytes). saved
         is the whole token list (for a delta too); parent: the save a delta continues."""
         sha = _sha(saved)
@@ -484,8 +505,10 @@ class SlotCache:
             array.array("I", saved).tofile(f)
         size = sum(os.path.getsize(p) for p in self._files(sha) if os.path.exists(p))
         depth = self.index[parent]["depth"] + 1 if parent else 0
-        self.index[sha] = {"n": len(saved), "last": time.time(), "bytes": size, "parent": parent, "depth": depth}
         key = self._conv_key(saved)
+        self.index[sha] = {"n": len(saved), "last": time.time(), "bytes": size, "parent": parent, "depth": depth, "key": key}
+        if after:   # the state after an answer: a prefix of the next turn only when the client sends the answer back as it was
+            self.index[sha]["after"] = True
         if depth >= self.chain > 0:   # a long chain: a full save the next time the layer is idle
             self.compact = (key, getattr(self, "last_auth", ""))
         elif depth == 0 and self.compact and self.compact[0] == key:
@@ -540,7 +563,7 @@ class SlotCache:
                     saved = self._toks_of(parent) + saved
                 if len(saved) <= len(toks) or saved[:len(toks)] != toks:
                     raise ValueError("the slot does not extend the request's tokens (%d tokens)" % len(saved))
-                sha, size = self._store(tmp, saved, parent)
+                sha, size = self._store(tmp, saved, parent, after=True)
                 if old_chain:
                     self._drop([x for x in old_chain if x != sha], "replaced (budget)")
                 self._add_tip(key, sha)
@@ -557,6 +580,79 @@ class SlotCache:
                         os.remove(os.path.join(self.folder, f))
                     except OSError:
                         pass
+
+    def _finish_before(self, *args, **kw):
+        """_finish_before_body, counted in bg_n (saving) until it ends, so a stop script can wait for the save."""
+        try:
+            return self._finish_before_body(*args, **kw)
+        finally:
+            with self.busy_lock:
+                self.bg_n = max(0, self.bg_n - 1)
+
+    def _finish_before_body(self, tmp, parent, base, key, auth, t1, t2, last_ref):
+        """A background save before a request: wait (without the lock) until the server has written the file, then index
+        it under the lock. The file holds the prompt up to the end of the last message (base), or a part of it. A failed
+        or lost write leaves no index entry."""
+        state, st = "pending", {}
+        t_end = time.time() + 1800
+        while time.time() < t_end:
+            try:
+                st = self._post("/slots/0?action=save_status", {"filename": tmp}, auth, timeout=30) or {}
+                state = st.get("state", "unknown")
+            except Exception as e:
+                state, st = "unknown", {"error": repr(e)}
+            if state != "pending":
+                break
+            time.sleep(0.1)
+        with self.lock:
+            try:
+                if state != "done":
+                    raise ValueError("background save %s: %s %s" % (tmp, state, st.get("error", "")))
+                saved = read_tokens(os.path.join(self.folder, tmp))
+                if parent:
+                    if parent not in self.index:
+                        raise ValueError("the parent of the delta was removed while it was written")
+                    saved = self._toks_of(parent) + saved
+                if len(saved) > len(base) or saved != base[:len(saved)]:   # exact: a prefix of the prompt
+                    raise ValueError("the save does not hold the prompt's tokens (%d tokens)" % len(saved))
+                sha, size = self._store(tmp, saved, parent)
+                if last_ref is not None and self.last is last_ref:   # the save after this request's answer builds on it
+                    last_ref["best_sha"], last_ref["best"] = sha, max(int(last_ref.get("best") or 0), len(saved))
+                self.log("saved", sha[:12], len(saved), "tokens (background): prefill", round(t2 - t1, 2), "s, copy", st.get("copy_ms"),
+                         "ms, write", st.get("write_ms"), "ms,", st.get("n_written"), "bytes",
+                         ("delta of %d" % self.index[parent]["n"]) if parent else "full")
+                self._evict()
+            except Exception as e:
+                self.log("save failed:", repr(e))
+                for f in (tmp, tmp + ".draft"):
+                    try:
+                        os.remove(os.path.join(self.folder, f))
+                    except OSError:
+                        pass
+
+    def wait_before(self, timeout=900.0):
+        """Wait until the background save before the last request is indexed. Call WITHOUT the lock (the thread takes it),
+        after the client has the answer and before after(): the save after the answer is then a delta of that save."""
+        th = self.before_bg
+        if th is not None and th.is_alive():
+            th.join(timeout)
+
+    def _drop_dead(self, key, toks):
+        """The conversation failed the exact test: the client or the template rewrote an answer (for example it dropped
+        the reasoning). Its saves after an answer that are not a token prefix of this prompt can not be restored for it:
+        remove them now (a save that another save builds on stays)."""
+        dead = []
+        tips = self.last_after.get(key, [])
+        for sha, e in list(self.index.items()):
+            if not (sha in tips or (e.get("after") and e.get("key") == key)):
+                continue
+            n = e["n"]
+            if n < len(toks) and _sha(toks[:n]) == sha:
+                continue
+            dead.append(sha)
+        if dead:
+            self._drop(dead, "removed (after an answer that the next turn rewrote)")
+            self.last_after[key] = self._tips(key)
 
     def _delta_ok(self, auth):
         if self.delta_ok is None:
@@ -665,15 +761,23 @@ class SlotCache:
                 if self.conv.get(key) is not ok:
                     self.log("after-answer test", key[:12], "pass" if ok else "fail", "(exact)")
                 self._set_conv(key, ok)
+                if not ok:
+                    self._drop_dead(key, toks)
                 self.fails[key] = 0 if ok else self.fails.get(key, 0) + 1
                 if len(self.fails) > 1000:
                     self.fails.pop(next(iter(self.fails)))
+            elif self.conv.get(key) is False:   # no test at this turn (after a restart): a conversation that is known to
+                self._drop_dead(key, toks)      # rewrite its answers keeps no save after an answer that is no prefix
             self.wait = None   # no cached-token test in this mode
         after_mode = self.after_on and not force_save and (self.conv.get(key) is True or (every and self.conv.get(key) is not False))
         if after_mode:
             info["slot_cache_after"] = "on"   # this conversation saves after the answer: no save before the request
-        need = (1 if best_n == 0 else self.grow) if force_save else self.grow
-        if not after_mode and len(base) < len(toks) and len(base) - max(best_n, 0) >= need:
+        # a new conversation (no test result yet): also a save before the request, so that a restart before the test
+        # can restore it whether or not the client sends the reasoning back
+        first = bool(every and self.first_on and self.conv.get(key) is None)
+        need = (1 if best_n == 0 else self.grow) if (force_save or first) else self.grow
+        bg_before = None
+        if (not after_mode or first) and len(base) < len(toks) and len(base) - max(best_n, 0) >= need:
             tmp = self._tmp()
             try:
                 t1 = time.time()
@@ -686,7 +790,19 @@ class SlotCache:
                                       and (info.get("slot_cache_restored") or best_n <= common)
                                       and self.index[best_sha]["depth"] < self.chain_max and self._delta_ok(auth)) else None
                 body = {"filename": tmp, **({"pos_min": self.index[parent]["n"]} if parent else {})}
+                bg = (not force_save) and self._async_ok(auth)   # in the background: the request does not wait for the write
+                if bg:
+                    body["async"] = True
                 r = self._post("/slots/0?action=save", body, auth)
+                if bg and r.get("pending"):
+                    bg_before = (tmp, parent, list(base), key, auth, t1, t2)
+                    info["slot_cache_saved"] = int(r.get("n_saved") or len(base))
+                    info["slot_cache_save_bg"] = True
+                    info["slot_cache_gen_prompt_tokens"] = len(toks) - len(base)
+                    info["slot_cache_prefill_s"] = round(t2 - t1, 2)
+                    info["slot_cache_save_s"] = round(time.time() - t2, 2)
+                    info["status"] = "saved (background)"
+                    raise _Pending()
                 if parent:   # exact: the parent's tokens + the file's tokens, a prefix of the prompt
                     saved = self._toks_of(parent) + read_tokens(os.path.join(self.folder, tmp))
                     if len(saved) > len(base) or saved != base[:len(saved)]:
@@ -704,6 +820,8 @@ class SlotCache:
                 info["status"] = "saved"
                 self.log("saved", sha[:12], len(saved), "tokens: prefill", info["slot_cache_prefill_s"], "s, save", info["slot_cache_save_s"], "s")
                 self._evict()
+            except _Pending:
+                pass
             except Exception as e:
                 self.log("save failed:", repr(e))
                 info["status"] = "failed: save " + repr(e)[:200]
@@ -726,6 +844,12 @@ class SlotCache:
             self.last = {"key": key, "toks": toks, "every": every, "best": max(best_n, int(info.get("slot_cache_saved") or 0)),
                          "best_sha": best_sha if (info.get("slot_cache_restored") or info.get("slot_cache_saved")
                                                   or (best_sha and best_n <= common)) else None}
+        if bg_before:   # the thread indexes the save when the server has written it, and tells self.last
+            with self.busy_lock:
+                self.bg_n += 1
+            self.before_bg = threading.Thread(target=self._finish_before, args=bg_before + (None if force_save else self.last,),
+                                              daemon=True)
+            self.before_bg.start()
         info["slot_cache_s"] = round(time.time() - t0, 2)
         return info
 
@@ -805,7 +929,7 @@ class SlotCache:
                     saved = self._toks_of(parent) + saved
                 if len(saved) <= len(toks) or saved[:len(toks)] != toks:   # another request used the slot in between
                     raise ValueError("the slot does not extend the request's tokens (%d tokens)" % len(saved))
-                sha, size = self._store(tmp, saved, parent)
+                sha, size = self._store(tmp, saved, parent, after=True)
                 if parent:
                     info["delta_of"] = self.index[parent]["n"]
                 if old_chain:

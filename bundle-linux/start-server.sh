@@ -319,9 +319,10 @@ TEMPLATE="$(pick CHAT_TEMPLATE "$ROOT/templates/kintsugi.jinja")"
 if [ "$TEMPLATE" != model ] && [ ! -f "$TEMPLATE" ]; then echo "chat template not found: $TEMPLATE (set KINTSUGI_CHAT_TEMPLATE)"; exit 1; fi
 SRV_HOST=$LISTEN; [ $USE_LAYER = 1 ] && SRV_HOST=127.0.0.1
 ARGS=(-m "$MODEL" -ngl 99 -c "$CTX" -fa on -np 1 -ub "$UB" --fit off --jinja
-      -ctk "$KV" -ctv "$KV" --kv-vram-cells "$CELLS" --kq-mask-packed --cache-ram 4096 --backend-sampling
+      -ctk "$KV" -ctv "$KV" --kv-vram-cells "$CELLS" --kq-mask-packed --cache-ram 4096
       --reasoning-budget 20480 -n 24576 --reasoning-budget-message "Now produce the complete answer."
       --reasoning-effort-allow medium --reasoning-effort-fallback medium --reasoning-max-tokens-floor 24576
+      --reasoning-max-tokens-honor 4096
       --host "$SRV_HOST" --port "$SERVER_PORT" ${SPEC[@]+"${SPEC[@]}"})
 [ "$TEMPLATE" != model ] && ARGS+=(--chat-template-file "$TEMPLATE")
 [ -n "$KEY_FILE" ] && ARGS+=(--api-key-file "$KEY_FILE")
