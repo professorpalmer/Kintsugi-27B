@@ -5,6 +5,30 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.1.5 (2026-11-24)
+
+- **Tool calls with `tool_choice: "required"` always end.** The grammar did not allow the end of the turn before a
+  call, and the text before the call had no limit. On a turn that needs no tool ("Hi there!"), the model answered in
+  text and then could not stop. Now the text before the call is at most 1,024 characters (no `<`), and then only the
+  call is allowed. In our test (10 tries of "Hi there!" with two tools, thinking on), 5 of 10 ran on without a call
+  on v1.1.4; on v1.1.5 10 of 10 end with a call (the longest in 8.6 s), on the plain server and through the layer.
+- **`tool_choice: "none"` no longer leaks a raw `<tool_call>` block.** The model is not shown the tool definitions
+  with "none" (the approach of llama.cpp PR #30434 by frozenblade1224), and the grammar does not let it start a call
+  (with tool calls in the earlier turns, the model copied the call format without the definitions). It answers in
+  text. In our test, 10 of 10 replies on v1.1.4 were a raw call; on v1.1.5 0 of 40 were a raw call and 0 of 40 were
+  empty (plain server and layer, with and without a tool call and its result in the earlier turns).
+- **`/v1/models` lists the model as `kintsugi`**, not as the path of the model file. `KINTSUGI_ALIAS` sets another
+  name; an `--alias` in `KINTSUGI_EXTRA` wins.
+- **The layer stops when the server stops during the load**, and the launcher prints the last lines of the server log
+  (Windows and Linux, with and without `--wait` / `-Wait`). The Linux launcher also names a missing shared library
+  before the start (`ldd` check). Patch by Doğukan Ürker (@DogukanUrker).
+- **No tracebacks in the layer log** from the launcher's `/health` checks while the model loads: the layer answers 503
+  until the server is up, and a client that hangs up is one log line.
+- **Linux README:** the report template, with Linux paths and fields.
+- Reported by Doğukan Ürker (@DogukanUrker) on an RTX 3060 12 GB with Linux (#15), with every request and number to
+  reproduce it. Engine: v1.1.2's (`b9c5b427d`) with the tool_choice changes (`d512c2d77`); the compute DLLs are
+  the same bytes as v1.1.4. Model file unchanged.
+
 ## v1.1.4 (2026-11-23)
 
 - **Launcher only: which setting to lower when the VRAM is short.** When you set `KINTSUGI_CELLS` by hand and the
