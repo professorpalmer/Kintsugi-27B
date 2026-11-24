@@ -73,6 +73,13 @@ if [ ! -f "$MODEL" ]; then
 fi
 [ -x "$BIN/llama-server" ] || { echo "llama-server not found in $BIN"; exit 1; }
 command -v nvidia-smi > /dev/null || { echo "nvidia-smi not found: install the NVIDIA driver"; exit 1; }
+# Every shared library of the engine must be found (bin/ first). A missing one stops the server at once, and the loader
+# error is only in the log.
+MISSING="$(LD_LIBRARY_PATH="$BIN${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ldd "$BIN/llama-server" 2> /dev/null | awk '/not found/ { print $1 }' | sort -u | tr '\n' ' ')"
+if [ -n "$MISSING" ]; then
+  echo "Kintsugi-27B: the engine needs shared libraries that this computer does not have: $MISSING"
+  exit 1
+fi
 command -v curl > /dev/null || { echo "curl not found: install curl (the start uses it to check the server)"; exit 1; }
 
 # ---- NVIDIA driver ------------------------------------------------------------------------------------------------------
@@ -433,7 +440,8 @@ for i in $(seq 1 150); do
   if ! alive "$SP"; then
     M="$(no_gpu_message "$LOG")"; [ -n "$M" ] && stop_no_gpu "$M"
     retry_mtp "the server stopped during the load"
-    echo "server stopped during load: see $LOG"; exit 1
+    [ -n "$LP" ] && kill "$LP" 2> /dev/null   # do not leave the layer running with no server behind it
+    echo "server stopped during load: see $LOG"; tail -n 3 "$LOG" | sed 's/^/  /'; exit 1
   fi
   if [ -n "$LP" ] && ! alive "$LP"; then echo "layer stopped: see $LAYER_LOG"; exit 1; fi
   sleep 2
