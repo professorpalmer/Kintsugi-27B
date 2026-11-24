@@ -26,10 +26,10 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
 
 ## Download and start
 
-1. Download `Kintsugi-27B-v1.1.4-linux-x86_64.tar.gz` from the Releases page and unpack it:
+1. Download `Kintsugi-27B-v1.1.5-linux-x86_64.tar.gz` from the Releases page and unpack it:
 
    ```
-   tar -xzf Kintsugi-27B-v1.1.4-linux-x86_64.tar.gz
+   tar -xzf Kintsugi-27B-v1.1.5-linux-x86_64.tar.gz
    cd Kintsugi-27B
    ```
 
