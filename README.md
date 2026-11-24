@@ -68,7 +68,11 @@ RAM on that box was enough for the full window with other programs closed.
 
 You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](bundle/README.md).
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.1.5-linux-x86_64.tar.gz` from the same Releases page, then
+Saved chats go to `slots` (up to 20 GB by default; past that, the files used longest ago are removed). Change the
+limit with `KINTSUGI_SLOT_CACHE_GB`, move the folder with `KINTSUGI_SLOT_SAVE_PATH`, or turn saving off with
+`KINTSUGI_LAYER=0`.
+
+**Linux (x86_64):** download `Kintsugi-27B-v1.1.6-linux-x86_64.tar.gz` from the same Releases page, then
 `tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
 glibc 2.34+ (Ubuntu 22.04 and 24.04); no other libraries. Full guide: [bundle-linux/README.md](bundle-linux/README.md).
 

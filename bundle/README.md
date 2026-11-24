@@ -79,6 +79,10 @@ built-in web page is not tested with images.
 
 - **In the browser:** open http://127.0.0.1:8080/ (the chat page that comes with the server).
 - **From an app:** point any OpenAI-compatible app at `http://127.0.0.1:8080/v1` (model name: anything; no key).
+- **Answer length (`max_tokens`):** with thinking on (the default), a `max_tokens` of 4,096 or more is kept, and the
+  thinking of that request ends early enough to leave room for the answer. A smaller value is raised to 24,576,
+  because the thinking alone can need more. For short capped answers turn the thinking off (`KINTSUGI_THINK=off`,
+  or `"chat_template_kwargs": {"enable_thinking": false}` in the request): then every `max_tokens` is kept.
 - **Agent harnesses** (Claude Code, Codex, Pi, OpenCode): see [harnesses/README.md](../harnesses/README.md) for the
   settings we tested (in the zip, the same text is `HARNESSES.md`).
 - **From PowerShell** (a quick test):
@@ -90,6 +94,11 @@ built-in web page is not tested with images.
 **Saved chats:** with Python 3.10 or newer in PATH (no extra packages), the start also runs a small layer in front of
 the server. The layer saves a long chat to disk after each answer. After a restart, the next turn of that chat starts
 in seconds, not minutes. Without Python, the server runs plain and the start prints a note. Everything else works.
+
+Disk use of saved chats: they go to `slots\` (up to 20 GB by default; past that, the files used longest ago are
+removed). A long chat keeps one full save (about 4.7 GB at 245k tokens) and smaller additions for the later turns. Change
+the limit with `KINTSUGI_SLOT_CACHE_GB`, move the folder with `KINTSUGI_SLOT_SAVE_PATH`, or turn saving off with
+`KINTSUGI_LAYER=0`.
 
 **Settings** are environment variables. For example, set `$env:KINTSUGI_CTX = 131072` before the start. The list is at
 the top of [start-server.ps1](start-server.ps1). By default, only this computer can connect.
