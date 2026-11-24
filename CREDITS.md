@@ -49,6 +49,8 @@ Kintsugi-27B stands on a lot of other people's work. If we missed you, tell us a
 - **Tomer Weller**: Metal language 4.0 when the tensor API is there.
 - **Aldehir Rojas**: the guard for anchored tool-call trigger patterns in the grammar (llama.cpp #32381), ported
   in v1.1.2.
+- **frozenblade1224**: tool definitions held back from the model when `tool_choice` is "none" (llama.cpp PR #30434),
+  the approach of the v1.1.5 fix.
 
 ## Drafting
 
@@ -101,6 +103,10 @@ measurements.
 ## Reports and tests
 
 - **Amel ([@donamelo](https://github.com/donamelo))**: DFlash2 VRAM reports on RTX 3080 Ti with exact settings and logs (v1.1.3 and v1.1.4).
+- **Doğukan Ürker ([@DogukanUrker](https://github.com/DogukanUrker))**: the RTX 3060 12 GB Linux report (#15): the full
+  262,144-token window on a second 12 GB card, speeds by depth, HumanEval, recall, and the tool-call, model-name,
+  layer and log findings fixed in v1.1.5; the Linux launcher patch (a missing-library check, and the layer stops when
+  the server stops during the load).
 
 ## Citations
 
