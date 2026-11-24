@@ -83,6 +83,8 @@ measurements.
 - **Lazm**: the first Linux RDNA3 test (RX 7900 XTX). He found the RDNA GEMV trap and its source line.
 - **Abdelrahman Waref ([awaref.me](https://awaref.me/))**: the first Windows RDNA3 test (RX 7900 XTX,
   amd-test-win1: KL -0.15 % against our CUDA engine, all checks PASS).
+- **Mustafa YILDIRIM ([@mustafayildirim](https://github.com/mustafayildirim))**: the first RDNA4 test (Radeon AI PRO
+  R9700, Linux). His amd-test-3 run found the missing hipBLASLt library on gfx1201; amd-test-4 passed every check.
 - **turboderp (exllamav3)**: the ROCm port of the EXL3 kernels: the emulated tensor-core fragments (`ptx_rocm.cuh`)
   and the native RDNA GEMV kernels (the one-row kernel, the multi-row core, and in amd-test-5 the "tiles" core,
   the multi-row design and the fused rotation epilogue), MIT.
