@@ -22,12 +22,19 @@ The source of each release build is a release asset. Licence: MIT, the same as l
 
 | Engine | Bundles | Source asset | sha256 |
 |---|---|---|---|
+| `7d9bb6296` | v1.1.7 (Windows and Linux) | `Kintsugi-27B-v1.1.7-engine-src-7d9bb6296.tar.gz` (43,086,685 bytes) | `7e0e727c66095394a38600d32f6dc737e93c0ec98272bb5c649be763e5602039` |
 | `8f12baacf` | v1.1.6 (Windows and Linux) | `Kintsugi-27B-v1.1.6-engine-src-8f12baacf.tar.gz` (43,075,805 bytes) | `c1c7812e1193f5604ee243cead1b269d49d160d72e1accb2b5564bc0d4081d1d` |
 | `d512c2d77` | v1.1.5 (Windows and Linux) | `Kintsugi-27B-v1.1.5-engine-src-d512c2d77.tar.gz` (43,085,588 bytes) | `488b500da95dbffb0a9845d2661027fcb374c153a6675debb8765a78942c63fa` |
 | `b9c5b427d` | v1.1.2 to v1.1.4 (Windows and Linux) | `Kintsugi-27B-v1.1.2-engine-src-b9c5b427d.tar.gz` (43,067,633 bytes) | `ebc9780d37977b077b190b172a6123e60d25cd6b439222e03a910c3d280427b0` |
 | `5f393adb5` | v1.1 (Windows and Linux), v1.1.1 (Linux) | `Kintsugi-27B-v1.1-engine-src-5f393adb5.tar.gz` (37,360,262 bytes) | `ded8fd4ee8c67c1088b173bd49a21ab201a1407d1ee64b2bcd01f9d3ebcaf4a6` |
 | `af70fc544` | v1.0.4 (Linux) | `Kintsugi-27B-v1.0.4-engine-src-af70fc544.tar.gz` (37,359,975 bytes) | `553c2222a156f5734be39206b19cb0bbd084d881bc473c9298d340ad807edd00` |
 | `c07efbec5` | v1 to v1.0.3 (Windows) | `Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz` (37,358,085 bytes) | `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7` |
+
+`7d9bb6296` = `8f12baacf` + (issue #17): the layer split of a model load no longer divides by 0 when every card
+reports 0 bytes free (an equal split; before: `invalid vector subscript` at the drafter load); host-memory errors
+name system memory with the numbers (tier host pages, `cudaMalloc` on Windows, `ggml_init`, the server after a
+failed load), and the server warns after the load when little commit is left. Test hook:
+`GGML_CUDA_TEST_HOST_LIMIT_MIB=N` makes pinned host pages past N MiB fail as out of memory.
 
 `8f12baacf` = `d512c2d77` + one server option, `--reasoning-max-tokens-honor N` (the launchers pass 4096): with thinking
 on, a client `max_tokens` of N or more (and below `--reasoning-max-tokens-floor`) is kept, and the reasoning budget of

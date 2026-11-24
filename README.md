@@ -72,7 +72,7 @@ Saved chats go to `slots` (up to 20 GB by default; past that, the files used lon
 limit with `KINTSUGI_SLOT_CACHE_GB`, move the folder with `KINTSUGI_SLOT_SAVE_PATH`, or turn saving off with
 `KINTSUGI_LAYER=0`.
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.1.6-linux-x86_64.tar.gz` from the same Releases page, then
+**Linux (x86_64):** download `Kintsugi-27B-v1.1.7-linux-x86_64.tar.gz` from the same Releases page, then
 `tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
 glibc 2.34+ (Ubuntu 22.04 and 24.04); no other libraries. Full guide: [bundle-linux/README.md](bundle-linux/README.md).
 

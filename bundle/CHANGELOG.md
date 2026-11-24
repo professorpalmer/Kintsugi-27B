@@ -5,6 +5,34 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.1.7 (2026-11-24)
+
+- **DFlash2 no longer stops at the drafter load with `invalid vector subscript`.** The engine puts the drafter's layers on
+  the cards in proportion to each card's free memory. When the card reported 0 bytes free at that moment (the main
+  model loaded, and the desktop or another program holds part of the card), 0 / 0 gave an index past the end of the
+  card list. The layers are now split in equal parts in that case; the allocation then works or reports out of memory.
+  Reproduced on an RTX 4070 with 1.5 GB of VRAM held by another program (v1.1.6: the same message through the
+  launcher at 131,072 and 262,144 tokens).
+- **Allocation errors name system memory, with the numbers.** A failed allocation of K/V cells in system RAM (pinned
+  RAM) says so, with the size, the system commit and the free RAM. On Windows a failed `cudaMalloc` also prints the
+  free VRAM and the system commit: there GPU memory takes system commit (RAM + page file) too, so that error can come
+  while the card still has room. After a failed load the server prints the system memory figures. A failed host
+  allocation in `ggml_init` is a message, not an assert. The drafter's context error names the drafter, not "MTP".
+- **Launcher (Windows): system-memory preflight.** It counts the VRAM that other programs hold, from the Windows GPU
+  memory counters (also the part that Windows moved out of VRAM for now; in the plan when the display is on the card,
+  else a note). Before the start it compares the pinned RAM of the planned window (the K/V cells in system RAM and the
+  two-stage head) with the free RAM, and its commit with the free commit. When the window does not fit, it starts with
+  the largest window that does (a multiple of 32,768) and prints a `memory` line with the numbers; with
+  `KINTSUGI_DRAFT=auto` it takes MTP + lookup when that keeps a larger window. When DFlash2 leaves few K/V cells in
+  VRAM, a note says how many MTP + lookup would keep. New settings: `KINTSUGI_MEMCHECK=0` (keep the full window),
+  `KINTSUGI_CACHE_RAM` (the server's prompt cache in RAM, default 4096 MiB), `KINTSUGI_GPU_COUNTERS=0`.
+- Checked: the RTX 4070 runs above give `invalid vector subscript` with v1.1.6 and start with v1.1.7; with an
+  emulated PC that has 1.1 GB of RAM free, v1.1.6 stops at the pinned-RAM allocation and v1.1.7 starts at 196,608 tokens
+  (DFlash2) or 229,376 (MTP + lookup with `KINTSUGI_DRAFT=auto`). Outputs equal to v1.1.6 (50 of 50 reference prompts
+  token-identical on Windows and on Linux), speed within 1.4 % of v1.1.6.
+- From the RTX 5070 report of xgxx666 (#17). Engine `7d9bb6296` = v1.1.6's with these fixes. Linux: the same launcher as
+  v1.1.6, the new engine. Model file unchanged.
+
 ## v1.1.6 (2026-11-24)
 
 - **`max_tokens` with thinking on.** A client `max_tokens` (or `max_completion_tokens`) of 4,096 or more is now kept.
