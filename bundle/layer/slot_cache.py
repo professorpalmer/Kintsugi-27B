@@ -616,8 +616,13 @@ class SlotCache:
                 if len(saved) > len(base) or saved != base[:len(saved)]:   # exact: a prefix of the prompt
                     raise ValueError("the save does not hold the prompt's tokens (%d tokens)" % len(saved))
                 sha, size = self._store(tmp, saved, parent)
-                if last_ref is not None and self.last is last_ref:   # the save after this request's answer builds on it
-                    last_ref["best_sha"], last_ref["best"] = sha, max(int(last_ref.get("best") or 0), len(saved))
+                # the save after the answer of the request that holds the slot now builds on it: this request, or a
+                # later one of the same conversation that came while the file was written (the save is a prefix of it)
+                cur = self.last
+                if cur is not None and (cur is last_ref or (cur.get("key") == key and len(saved) <= len(cur["toks"])
+                                                            and cur["toks"][:len(saved)] == saved)):
+                    if len(saved) >= int(cur.get("best") or 0) or not cur.get("best_sha"):
+                        cur["best_sha"], cur["best"] = sha, max(int(cur.get("best") or 0), len(saved))
                 self.log("saved", sha[:12], len(saved), "tokens (background): prefill", round(t2 - t1, 2), "s, copy", st.get("copy_ms"),
                          "ms, write", st.get("write_ms"), "ms,", st.get("n_written"), "bytes",
                          ("delta of %d" % self.index[parent]["n"]) if parent else "full")
@@ -777,7 +782,12 @@ class SlotCache:
         first = bool(every and self.first_on and self.conv.get(key) is None)
         need = (1 if best_n == 0 else self.grow) if (force_save or first) else self.grow
         bg_before = None
-        if (not after_mode or first) and len(base) < len(toks) and len(base) - max(best_n, 0) >= need:
+        # a save before a request that is still being written (a 245k save takes 10-110 s by drive): no second one
+        # (the server writes one at a time, and this request would wait for that write); the turn runs without it
+        writing = self.before_bg is not None and self.before_bg.is_alive() and not force_save
+        if writing:
+            info["slot_cache_save_bg"] = "writing"
+        if (not after_mode or first) and not writing and len(base) < len(toks) and len(base) - max(best_n, 0) >= need:
             tmp = self._tmp()
             try:
                 t1 = time.time()

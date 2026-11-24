@@ -980,11 +980,14 @@ class Proxy(http.server.BaseHTTPRequestHandler):
                 self.connection.shutdown(socket.SHUT_WR)
         except Exception:
             pass
+        mine = getattr(self.slots, "last", None)   # this request, as before() noted it
         try:   # a background save before this request: wait for it (outside the lock), so the save below is its delta
             self.slots.wait_before()
         except Exception:
             pass
         with self.slots.lock:
+            if mine is not None and self.slots.last is not mine:
+                return   # a later request took the slot during the wait: its own save after the answer covers this one
             try:
                 got = self.slots.after(self.headers.get("Authorization", ""))
                 if got:
