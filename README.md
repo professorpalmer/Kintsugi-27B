@@ -37,6 +37,17 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
   cannot load that context, and level on agent tasks (AppWorld 294 vs 283 of 336, not significant; corrected 11-21)
   ([details](benchmarks/README.md#head-to-head-inkling-2-mini-on-the-same-12-gb-card)).
 
+**Measured on two 12 GB cards** (the full 262,144-token window, launcher defaults, MTP + lookup drafting; decode =
+thinking off, 400 tokens, mean of a code, a prose and a bash prompt, a fresh server for each depth):
+
+| Card | OS | VRAM in use | Decode at 64k / 117k / 200k / 245k | First read of 245k | HumanEval (pass@1) | Recall | Measured by |
+|---|---|---|---|---|---|---|---|
+| RTX 4070 12 GB | Windows 11 | about 11.6 GB, no spill | 67 / 59 / 49 / 31 tok/s | 589 tok/s (414 s) | 161 / 164 | 24 / 24 needles + 20 / 20 code copies at 245k | us ([benchmarks](benchmarks/README.md)) |
+| RTX 3060 12 GB | Debian 13 | 11.6 GB at every depth, no spill | 33.2 / 31.6 / 25.6 / 16.8 tok/s (41.5 short) | 265 tok/s (922 s) | 161, 160, 161 / 164 (three runs) | all correct at 117k, 245k and 258k (his own needle and code-copy set) | Doğukan Ürker ([@DogukanUrker](https://github.com/DogukanUrker), [#15](https://github.com/professorpalmer/Kintsugi-27B/issues/15)) |
+
+The RTX 3060 has about half the memory bandwidth of the RTX 4070, so decode is about half as fast; the 16 GB of system
+RAM on that box was enough for the full window with other programs closed.
+
 ![Kintsugi-27B](kintsugi-card.png)
 
 ![Kintsugi-27B highlights](benchmarks/kintsugi-27b-highlights.png)
@@ -57,7 +68,7 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 
 You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](bundle/README.md).
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.1.4-linux-x86_64.tar.gz` from the same Releases page, then
+**Linux (x86_64):** download `Kintsugi-27B-v1.1.5-linux-x86_64.tar.gz` from the same Releases page, then
 `tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
 glibc 2.34+ (Ubuntu 22.04 and 24.04); no other libraries. Full guide: [bundle-linux/README.md](bundle-linux/README.md).
 
