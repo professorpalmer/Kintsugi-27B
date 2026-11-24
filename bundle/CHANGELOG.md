@@ -5,6 +5,36 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.1.6 (2026-11-24)
+
+- **`max_tokens` with thinking on.** A client `max_tokens` (or `max_completion_tokens`) of 4,096 or more is now kept.
+  The thinking of that request then ends early enough to leave room for the answer (its reasoning budget becomes
+  `max_tokens` minus 1,024; new engine option `--reasoning-max-tokens-honor 4096`). A smaller cap is still raised to
+  24,576: in our test a cap of 400 with thinking on ended 3 of 4 requests inside the thinking, with no answer. Caps
+  of 24,576 or more do not change, and with thinking off every cap is kept, as before. In our test (RTX 4070), a prompt that thinks for a
+  long time with `max_tokens: 4096` gave 10,978 tokens on v1.1.5 and 4,096 on v1.1.6 (the thinking ended at 3,077
+  tokens, then about 1,500 characters of answer).
+- **Saved chats when the app does not send the reasoning back** (most OpenAI-style apps, with thinking on). A new long
+  chat now also saves before its first request, in the background (the request does not wait for the write). Before,
+  the only save of the first turn was the one after the answer, and that state is not a start of the next request when
+  the reasoning is dropped: a restart before the third turn read the whole chat again. Measured (RTX
+  4070): turn 2 right after a restart starts in 1.9 s for a 63k-token chat and in 6.3 s for a 231k-token chat
+  (v1.1.5: 54 s and 378 s); the first token of turn 1 comes as fast as before (54.4 s against 54.1 s; 379.4 s
+  against 377.0 s).
+- **Less disk use for saved chats (#12).** The save after an answer is now a small addition to the first save, not a
+  second full save. When a chat shows that it rewrites the answers (for example it drops the reasoning), its saves
+  after an answer that can not be restored any more are removed at once, and such a chat no longer gets the idle
+  full save that replaced its useful saves. The same 4 turns with two restarts: 4.67 GB in
+  `slots` for a 231k-token chat (v1.1.5: 13.81 GB) and 1.95 GB for a 63k-token chat (v1.1.5: 4.71 GB).
+- **`--backend-sampling` is gone from the launchers.** It was turned off for every request with thinking or tool
+  calls (with a warning line for each), and gave no speed with thinking off. Side by side
+  on the RTX 4070 (thinking off, a fresh server for each run, 2 runs each): 77.6 against 77.6 tokens/s (v1.1.5 /
+  v1.1.6, MTP at 4k), 66.4 against 67.1 (MTP at 64k), 92.2 against 92.2 (DFlash2 at 4k): equal within 1.1 %.
+- **Linux:** the engine binaries search only their own folder for libraries (`RUNPATH $ORIGIN`; before, the path of
+  our build folder was in it too).
+- From the RTX 3060 report of Doğukan Ürker (@DogukanUrker, #15). Engine `8f12baacf` = v1.1.5's with the
+  `max_tokens` change in the server; the GPU code is the same bytes as v1.1.4. Model file unchanged.
+
 ## v1.1.5 (2026-11-24)
 
 - **Tool calls with `tool_choice: "required"` always end.** The grammar did not allow the end of the turn before a
