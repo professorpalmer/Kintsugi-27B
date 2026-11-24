@@ -22,10 +22,17 @@ The source of each release build is a release asset. Licence: MIT, the same as l
 
 | Engine | Bundles | Source asset | sha256 |
 |---|---|---|---|
-| `b9c5b427d` | v1.1.2 (Windows and Linux) | `Kintsugi-27B-v1.1.2-engine-src-b9c5b427d.tar.gz` (43,067,633 bytes) | `ebc9780d37977b077b190b172a6123e60d25cd6b439222e03a910c3d280427b0` |
+| `d512c2d77` | v1.1.5 (Windows and Linux) | `Kintsugi-27B-v1.1.5-engine-src-d512c2d77.tar.gz` (43,085,588 bytes) | `488b500da95dbffb0a9845d2661027fcb374c153a6675debb8765a78942c63fa` |
+| `b9c5b427d` | v1.1.2 to v1.1.4 (Windows and Linux) | `Kintsugi-27B-v1.1.2-engine-src-b9c5b427d.tar.gz` (43,067,633 bytes) | `ebc9780d37977b077b190b172a6123e60d25cd6b439222e03a910c3d280427b0` |
 | `5f393adb5` | v1.1 (Windows and Linux), v1.1.1 (Linux) | `Kintsugi-27B-v1.1-engine-src-5f393adb5.tar.gz` (37,360,262 bytes) | `ded8fd4ee8c67c1088b173bd49a21ab201a1407d1ee64b2bcd01f9d3ebcaf4a6` |
 | `af70fc544` | v1.0.4 (Linux) | `Kintsugi-27B-v1.0.4-engine-src-af70fc544.tar.gz` (37,359,975 bytes) | `553c2222a156f5734be39206b19cb0bbd084d881bc473c9298d340ad807edd00` |
 | `c07efbec5` | v1 to v1.0.3 (Windows) | `Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz` (37,358,085 bytes) | `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7` |
+
+`d512c2d77` = `b9c5b427d` + tool-call fixes in `common/chat.cpp` (Qwen3-Coder tool format, issue #15): with
+`tool_choice` "required" the text before the call is at most 1,024 characters, then only the call is allowed; with
+"none" the tool definitions are not shown to the model (as llama.cpp PR #30434 by frozenblade1224), the grammar
+blocks the start of a call, and the answer can not be empty. New `test-chat` cases on the Kintsugi-27B template. The
+GPU code is unchanged.
 
 `b9c5b427d` = `5f393adb5` + two changes: the grammar guard of llama.cpp #32381 (Aldehir Rojas: an anchored tool-call
 trigger pattern must not fall back to a search; Kintsugi's own trigger is a fixed tag, so its tool calls do not
