@@ -83,6 +83,11 @@ built-in web page is not tested with images.
   thinking of that request ends early enough to leave room for the answer. A smaller value is raised to 24,576,
   because the thinking alone can need more. For short capped answers turn the thinking off (`KINTSUGI_THINK=off`,
   or `"chat_template_kwargs": {"enable_thinking": false}` in the request): then every `max_tokens` is kept.
+- **System memory:** the K/V cells that do not fit in VRAM are pinned system RAM (they can not go to the page file),
+  and other programs (the desktop, a browser) can hold VRAM that nvidia-smi does not show. Before the start the
+  launcher counts both; when the window does not fit, it starts with the largest window that does and prints a
+  `memory` line with the numbers. `KINTSUGI_MEMCHECK=0` keeps the full window; `KINTSUGI_CACHE_RAM` sets the
+  server's prompt cache in RAM (default 4096 MiB).
 - **Agent harnesses** (Claude Code, Codex, Pi, OpenCode): see [harnesses/README.md](../harnesses/README.md) for the
   settings we tested (in the zip, the same text is `HARNESSES.md`).
 - **From PowerShell** (a quick test):
