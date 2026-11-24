@@ -34,6 +34,8 @@
 #   KINTSUGI_SLOT_SAVE_PATH  folder of the saved conversations (default slots/ in this folder)
 #   KINTSUGI_SLOT_CACHE_GB   size limit of that folder in GB (default 20; the oldest files are removed past it)
 #   KINTSUGI_UB            micro-batch for prompt reads (default 1024; 512 saves about 146 MiB and reads 8-13 % slower)
+#   KINTSUGI_ALIAS         the model name that /v1/models lists and replies carry (default kintsugi; an --alias in
+#                          KINTSUGI_EXTRA wins)
 #   KINTSUGI_EXTRA         more llama-server arguments
 #   KINTSUGI_CHAT_TEMPLATE chat template file (default templates/kintsugi.jinja); "model" = the template inside the
 #                          model file; any other value = the path of your own template
@@ -327,6 +329,9 @@ ARGS=(-m "$MODEL" -ngl 99 -c "$CTX" -fa on -np 1 -ub "$UB" --fit off --jinja
 [ "$VISION" != off ] && ARGS+=(--mmproj "$MMPROJ" --image-max-tokens "$IMG_MAX")
 [ "$VISION" = cpu ] && ARGS+=(--no-mmproj-offload)
 EXTRA="$(pick EXTRA '')"
+# The model name clients see (/v1/models, the "model" of each reply): "kintsugi", not the model file's path.
+ALIAS="$(pick ALIAS kintsugi)"
+[[ " $EXTRA " =~ [[:space:]](--alias|-a)[[:space:]] ]] || ARGS+=(--alias "$ALIAS")
 [ -n "$EXTRA" ] && read -r -a EXTRA_ARGS <<< "$EXTRA" && ARGS+=("${EXTRA_ARGS[@]}")
 
 echo "Kintsugi-27B"
@@ -392,6 +397,10 @@ if [ $WAIT = 0 ]; then
     sleep 1
   done
   M="$(no_gpu_message "$LOG")"; [ -n "$M" ] && stop_no_gpu "$M"
+  if ! alive "$SP"; then
+    [ -n "$LP" ] && kill "$LP" 2> /dev/null   # do not leave the layer running with no server behind it
+    echo "server stopped during load: see $LOG"; tail -n 3 "$LOG" | sed 's/^/  /'; exit 1
+  fi
   exit 0
 fi
 AUTH=(); [ -n "$KEY_FILE" ] && AUTH=(-H "Authorization: Bearer $(tr -d '\r\n' < "$KEY_FILE")")

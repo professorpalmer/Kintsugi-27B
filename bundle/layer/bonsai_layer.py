@@ -283,6 +283,20 @@ def apply_cards(body, msgs):
     return msgs, 0
 
 
+class QuietServer(http.server.ThreadingHTTPServer):
+    """A client that hangs up (a /health poll that timed out, a closed browser tab) is normal: one short log line, not
+    a traceback. Other errors keep the full traceback."""
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        e = sys.exc_info()[1]
+        if isinstance(e, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError, TimeoutError)):
+            sys.stderr.write("[proxy] client %s:%s closed the connection (%s)\n" % (client_address[0], client_address[1],
+                                                                                     type(e).__name__))
+            return
+        super().handle_error(request, client_address)
+
+
 class Proxy(http.server.BaseHTTPRequestHandler):
     upstream = "http://127.0.0.1:8080"
     # SSE comment sent while the server is silent, every this many seconds (0 = off). A prefill of 100k+ tokens
@@ -922,6 +936,13 @@ class Proxy(http.server.BaseHTTPRequestHandler):
                 status, rh, data = r.status, r.headers, r.read()
         except urllib.error.HTTPError as e:
             status, rh, data = e.code, e.headers, e.read()
+        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as e:
+            # the server is not up yet (a /health poll while the model loads: refused or reset) or stopped: a short 503,
+            # as the server itself answers while it loads, and no traceback in the log
+            reason = getattr(e, "reason", e)
+            return self._reply(503, "application/json", json.dumps(
+                {"error": {"code": 503, "message": "the server is not ready (%s)" % type(reason).__name__,
+                           "type": "unavailable_error"}}).encode())
         self.send_response(status)
         for k in ("Content-Type", "Content-Encoding", "Cache-Control", "ETag", "Last-Modified", "Vary"):
             v = rh.get(k)
@@ -1190,6 +1211,6 @@ if __name__ == "__main__":
     Proxy.slots = slot_cache.SlotCache.from_env(a.upstream)
     if Proxy.slots:
         print(f"bonsai layer: saved conversations in {Proxy.slots.folder} ({len(Proxy.slots.index)} on disk)", flush=True)
-    srv = http.server.ThreadingHTTPServer((a.host, a.port), Proxy)
+    srv = QuietServer((a.host, a.port), Proxy)
     print(f"bonsai layer on {a.host}:{a.port} -> {a.upstream}", flush=True)
     srv.serve_forever()
