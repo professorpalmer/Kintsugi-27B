@@ -31,6 +31,8 @@
 #   KINTSUGI_LAYER         1 (default) = saved conversations through the layer (needs Python); 0 = plain server
 #   KINTSUGI_SLOT_SAVE_PATH  folder of the saved conversations (default slots\ in this folder)
 #   KINTSUGI_SLOT_CACHE_GB   size limit of that folder in GB (default 20; the oldest files are removed past it)
+#   KINTSUGI_CACHE_RAM     MiB of system RAM for the server's prompt cache (default 4096; 0 = off)
+#   KINTSUGI_GPU_COUNTERS  1 (default) = count the VRAM that other programs hold (Windows GPU memory counters); 0 = nvidia-smi only
 #   KINTSUGI_UB            micro-batch for prompt reads (default 1024; 512 saves about 146 MiB and reads 8-13 % slower)
 #   KINTSUGI_ALIAS         the model name that /v1/models lists and replies carry (default kintsugi; an --alias in
 #                          KINTSUGI_EXTRA wins)
@@ -143,6 +145,72 @@ if (-not $HalfBytes.ContainsKey($Kv)) { throw "KINTSUGI_KV must be one of: $($Ha
 $Cell = 2 * $HalfBytes[$Kv]
 $q = (& nvidia-smi --query-gpu=memory.total,memory.used,display_active --format=csv,noheader,nounits | Select-Object -First 1).Split(',')
 $TotalMiB = [int]$q[0]; $UsedMiB = [int]$q[1]; $Headless = $q[2].Trim() -ne 'Enabled'
+$SmiUsedMiB = $UsedMiB
+if ((Pick 'TEST_DISPLAY' '') -eq '1') { $Headless = $false }   # test hook: plan as with a display on the card
+# ---- VRAM of other programs (issue #17). Windows moves memory of an idle program out of VRAM and back when it needs
+# ---- it; nvidia-smi shows only what is in VRAM now. The Windows GPU memory counters ("Total Committed" of each process
+# ---- on this card) show all of it. With the display on this card the plan counts the larger figure: the desktop uses
+# ---- its memory again whenever the screen changes. With no display on the card: a note only (an idle program's memory
+# ---- stays out of VRAM; rig test 2026-11-24). KINTSUGI_GPU_COUNTERS=0 skips this.
+$OthersMiB = $null
+if ((Pick 'GPU_COUNTERS' '1') -ne '0') {
+    $t = Pick 'TEST_OTHERS_MIB' ''
+    if ($t) { $OthersMiB = [int]$t } else {
+        try {
+            Add-Type -ErrorAction Stop -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class KtGpu {
+    [StructLayout(LayoutKind.Sequential)] public struct LUID { public uint Low; public int High; }
+    [StructLayout(LayoutKind.Sequential)] public struct ADAPTERINFO { public uint hAdapter; public LUID Luid; public uint NumOfSources; public int Precise; }
+    [StructLayout(LayoutKind.Sequential)] public struct ENUM2 { public uint NumAdapters; public IntPtr pAdapters; }
+    [StructLayout(LayoutKind.Sequential)] public struct QUERY { public uint hAdapter; public int Type; public IntPtr pData; public uint Size; }
+    [StructLayout(LayoutKind.Sequential)] public struct DEVIDS { public uint PhysIndex; public uint Vendor; public uint Device; public uint SubVendor; public uint SubSystem; public uint Revision; public uint Bus; }
+    [StructLayout(LayoutKind.Sequential)] public struct CLOSE { public uint hAdapter; }
+    [DllImport("gdi32.dll")] static extern int D3DKMTEnumAdapters2(ref ENUM2 e);
+    [DllImport("gdi32.dll")] static extern int D3DKMTQueryAdapterInfo(ref QUERY q);
+    [DllImport("gdi32.dll")] static extern int D3DKMTCloseAdapter(ref CLOSE c);
+    public static string[] Luids(uint vendor) {
+        var res = new System.Collections.Generic.List<string>();
+        var e = new ENUM2();
+        if (D3DKMTEnumAdapters2(ref e) != 0 || e.NumAdapters == 0) { return res.ToArray(); }
+        int sz = Marshal.SizeOf(typeof(ADAPTERINFO));
+        e.pAdapters = Marshal.AllocHGlobal(sz * (int) e.NumAdapters);
+        try {
+            if (D3DKMTEnumAdapters2(ref e) != 0) { return res.ToArray(); }
+            for (int i = 0; i < e.NumAdapters; i++) {
+                var a = (ADAPTERINFO) Marshal.PtrToStructure(new IntPtr(e.pAdapters.ToInt64() + i * sz), typeof(ADAPTERINFO));
+                IntPtr p = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(DEVIDS)));
+                Marshal.StructureToPtr(new DEVIDS(), p, false);
+                var q = new QUERY { hAdapter = a.hAdapter, Type = 31, pData = p, Size = (uint) Marshal.SizeOf(typeof(DEVIDS)) };
+                if (D3DKMTQueryAdapterInfo(ref q) == 0 && ((DEVIDS) Marshal.PtrToStructure(p, typeof(DEVIDS))).Vendor == vendor) {
+                    res.Add(string.Format("luid_0x{0:x8}_0x{1:x8}", a.Luid.High, a.Luid.Low));
+                }
+                Marshal.FreeHGlobal(p);
+                var c = new CLOSE { hAdapter = a.hAdapter };
+                D3DKMTCloseAdapter(ref c);
+            }
+        } finally { Marshal.FreeHGlobal(e.pAdapters); }
+        return res.ToArray();
+    }
+}
+'@
+            $luids = @([KtGpu]::Luids(0x10DE))
+            if ($luids.Count -eq 1) {
+                $s = (Get-Counter '\GPU Process Memory(*)\Total Committed' -ErrorAction Stop).CounterSamples | Where-Object { $_.InstanceName -like "*$($luids[0])*" }
+                $OthersMiB = [int](($s | Measure-Object CookedValue -Sum).Sum / 1MB)
+            }
+        } catch { $OthersMiB = $null }
+    }
+    if ($null -ne $OthersMiB -and $OthersMiB -gt $UsedMiB + 64) {
+        if (-not $Headless) {
+            Write-Host "note   other programs hold $OthersMiB MiB of this card (Windows GPU memory counters; nvidia-smi shows $UsedMiB MiB in VRAM now): with the display on this card the plan counts $OthersMiB MiB (KINTSUGI_GPU_COUNTERS=0 skips this)"
+            $UsedMiB = $OthersMiB
+        } else {
+            Write-Host "note   other programs hold $OthersMiB MiB of this card (Windows GPU memory counters; nvidia-smi shows $UsedMiB MiB in VRAM now). If they use it again, the server can spill to system RAM and get slow (a 'spill' line in the server log): close them for full speed"
+        }
+    }
+}
 if ($TotalMiB -lt 11500) { Write-Host "WARN   this card has $TotalMiB MiB of VRAM. Kintsugi-27B needs a 12 GB card (the model alone takes about 9.5 GB): it may not load, or most of the context will be in system RAM and slow." }
 # Margin under the card's limit, on top of the measured growth (a display on the card moves by itself, so more margin).
 $Margin = [int](Pick 'MARGIN' $(if ($Headless) { 250 } else { 600 }))
@@ -170,7 +238,7 @@ function Test-MtpRetry($why) {
     # the driver frees the memory of a stopped process a moment later; the cell count of the retry reads the free VRAM
     for ($i = 0; $i -lt 20; $i++) {
         $u = [int]((& nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits) | Select-Object -First 1)
-        if ($u -le $script:UsedMiB + 64) { break }
+        if ($u -le $script:SmiUsedMiB + 64) { break }
         Start-Sleep 1
     }
     if ($script:SetDflashUb) { Remove-Item Env:LLAMA_DFLASH_DRAFT_UBATCH -ErrorAction SilentlyContinue }
@@ -278,6 +346,60 @@ function Test-MtpRetry($why) {
         Write-Host "       To fix it: $LowerLine. The launcher keeps your value."
     }
 
+    # ---- System memory (issue #17). The K/V cells in system RAM are pinned RAM (never in the page file), the two-stage
+    # ---- head takes 1,288 MiB pinned, and the server about 3,700 MiB (DFlash2) / 5,000 MiB (MTP) of other commit
+    # ---- (measured, RTX 4070, 2026-11-24). A 16 GB PC with 1.1 GB of RAM free failed at 4.5 GB of host cells and started
+    # ---- at 1.1 GB (#17). The launcher takes the largest window (a multiple of 32,768) whose host part fits: pinned
+    # ---- <= free RAM + 2,048 MiB (Windows trims other programs to make room), and commit <= free commit (RAM + page
+    # ---- file). With KINTSUGI_DRAFT=auto it takes MTP + lookup when that keeps a larger window. KINTSUGI_MEMCHECK=0 skips.
+    $CacheRam = [int](Pick 'CACHE_RAM' 4096)
+    $Head2Pin = if ($Head2 -gt 0) { 1288 } else { 0 }
+    $CommitFree = $null; $RamFree = $null
+    try { $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop; $CommitFree = [int]($os.FreeVirtualMemory / 1KB); $RamFree = [int]($os.FreePhysicalMemory / 1KB) } catch { }
+    $t = Pick 'TEST_COMMIT_FREE_MIB' ''; if ($t) { $CommitFree = [int]$t }
+    $t = Pick 'TEST_RAM_FREE_MIB' ''; if ($t) { $RamFree = [int]$t }
+    function CellsAt($fixed, $growth, $ctx) {
+        $budget = ([math]::Min($TotalMiB, $Ceiling) - $UsedMiB - $Margin - $fixed - $growth) * 1MB - $ctx * $Cell / 16
+        [int][math]::Min($ctx, [math]::Max(3328, [math]::Floor($budget / ($Cell * 15 / 16) / 256) * 256))
+    }
+    function HostMiB($ctx, $cells) { [int](($ctx - $cells) * $Cell / 1MB) }
+    function Fits($ctx, $cells, $mode) {
+        $h = (HostMiB $ctx $cells) + $Head2Pin
+        $pinOk = ($null -eq $RamFree) -or ($h -le $RamFree + 2048)
+        $comOk = ($null -eq $CommitFree) -or ($h + $(if ($mode -eq 'dflash') { 3700 } else { 5000 }) + 512 -le $CommitFree)
+        $pinOk -and $comOk
+    }
+    function FitWindow($fixed, $growth, $mode) {
+        for ($c = $Ctx; $c -ge 32768; $c -= 32768) { $n = CellsAt $fixed $growth $c; if (Fits $c $n $mode) { return @($c, $n) } }
+        return @(32768, (CellsAt $fixed $growth 32768))
+    }
+    if ((Pick 'MEMCHECK' '1') -ne '0' -and $null -ne $RamFree -and -not (Fits $Ctx $Cells $Mode)) {
+        $Why = "the K/V cells in system RAM need $(HostMiB $Ctx $Cells) MiB of pinned RAM$(if ($Head2Pin) { " (and the two-stage head $Head2Pin MiB)" }); $RamFree MiB of RAM is free, $CommitFree MiB of commit (RAM + page file)"
+        if ((Pick 'CTX' '') -or (Pick 'CELLS' '')) {
+            Write-Host "WARN   system memory: $Why. The load can fail with out of memory. KINTSUGI_CTX / KINTSUGI_CELLS are yours, so the launcher keeps them; to fix it: close other programs, or lower KINTSUGI_CTX."
+        } else {
+            $Ctx0 = $Ctx
+            $Fit = FitWindow $Fixed $Growth $Mode
+            if ($Mode -eq 'dflash' -and $DraftSet -eq 'auto') {
+                $FitM = FitWindow ($Fixed - $DrafterMiB) ($Growth - 128) 'mtp'
+                if ($FitM[0] -gt $Fit[0]) {
+                    Write-Host "memory $Why. MTP + lookup drafting keeps a window of $($FitM[0]) tokens, DFlash2 only $($Fit[0]): MTP + lookup."
+                    $Mode = 'mtp'; $Fixed = $Fixed - $DrafterMiB; $Growth = $Growth - 128; $DrafterMiB = 0; $Fit = $FitM
+                }
+            }
+            $Ctx = [int]$Fit[0]; $Cells = [int]$Fit[1]
+            if ($Ctx -lt $Ctx0) { Write-Host "memory window $Ctx0 -> $Ctx tokens ($Cells cells in VRAM), so the K/V cells in system RAM fit$(if ($Mode -ne 'mtp' -or $DraftSet -ne 'auto') { ": $Why" })." }
+            Write-Host "       For the full window: close other programs (RAM), or make the page file larger. KINTSUGI_MEMCHECK=0 keeps the full window (the load can then fail with out of memory)."
+        }
+    }
+    # ---- DFlash2 with few cells in VRAM (#17: 3,328 on a 12 GB card with a display): MTP + lookup keeps more of the window
+    if ($Mode -eq 'dflash') {
+        $MtpCells = CellsAt ($Fixed - $DrafterMiB) ($Growth - 128) $Ctx
+        if ($Cells -lt 32768 -and $MtpCells -ge $Cells + 8192) {
+            Write-Host "note   DFlash2 leaves $Cells K/V cells in VRAM (its drafter takes about $($DrafterMiB + 128) MiB); MTP + lookup (KINTSUGI_DRAFT=mtp) would keep $MtpCells. DFlash2 drafts up to 7 tokens a step; with MTP more of a long chat is read from VRAM."
+        }
+    }
+
     # ---- Drafting: the model's own MTP block (draft 3) + lookup drafting out of the prompt -----------------------------------
     $Draft = if ($Mode -eq 'mtp') { $MtpDraft } elseif ($Mode -eq 'dflash') { 7 } else { 0 }
     $Spec = @()
@@ -344,7 +466,7 @@ function Test-MtpRetry($why) {
     $Template = Pick 'CHAT_TEMPLATE' (Join-Path $Root 'templates\kintsugi.jinja')
     if ($Template -ne 'model' -and -not (Test-Path $Template)) { throw "chat template not found: $Template (set KINTSUGI_CHAT_TEMPLATE)" }
     $SrvArgs = @('-m', ('"' + $Model + '"'), '-ngl', '99', '-c', "$Ctx", '-fa', 'on', '-np', '1', '-ub', "$Ub", '--fit', 'off', '--jinja',
-              '-ctk', $Kv, '-ctv', $Kv, '--kv-vram-cells', "$Cells", '--kq-mask-packed', '--cache-ram', '4096',
+              '-ctk', $Kv, '-ctv', $Kv, '--kv-vram-cells', "$Cells", '--kq-mask-packed', '--cache-ram', "$CacheRam",
               '--reasoning-budget', '20480', '-n', '24576', '--reasoning-budget-message', '"Now produce the complete answer."',
               '--reasoning-effort-allow', 'medium', '--reasoning-effort-fallback', 'medium', '--reasoning-max-tokens-floor', '24576', '--reasoning-max-tokens-honor', '4096',
               '--host', $(if ($UseLayer) { '127.0.0.1' } else { $ListenHost }), '--port', "$ServerPort") + $Spec
