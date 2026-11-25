@@ -26,6 +26,9 @@ and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: 
 - **Rules hold deep into agent sessions**: after up to 237k tokens of its own agent trace, Kintsugi-27B kept all five
   standing system-prompt rules with no decay, and was not worse than Qwen3.8-27B BF16 on any rule or depth
   ([research/persistence-at-depth](research/persistence-at-depth/README.md); the test sees only large gaps).
+- **Multi-turn tool use**: on BFCL v3 multi-turn, Kintsugi-27B passes 505 of 800 entries and Qwen3.8-27B BF16 passes
+  461, higher in all 4 categories (one run per model; the BF16 run used another card and engine build, so a setup
+  effect is not ruled out; [details](benchmarks/bfcl/README.md)).
 - **Runs on RTX 20, 30, 40 and 50 cards and on H100 / H200** with 12 GB or more (RTX 50 and H100 from v1.1.2: one
   download for all of them; CUDA loads only your card's code, so the others cost no VRAM or speed), and **on Apple
   Silicon Macs** ([mac/](mac/README.md): chat and an OpenAI-compatible server; tested on an M5 Max). AMD (ROCm / HIP)
@@ -51,6 +54,8 @@ RAM on that box was enough for the full window with other programs closed.
 ![Kintsugi-27B](kintsugi-card.png)
 
 ![Kintsugi-27B highlights](benchmarks/kintsugi-27b-highlights.png)
+
+![Kintsugi-27B vs Qwen3.8-27B BF16 on BFCL multi-turn tool use](benchmarks/kintsugi-vs-bf16-bfcl.png)
 
 ![Rules hold to 237k tokens: no decay, level with full precision](benchmarks/persistence-at-depth.png)
 
