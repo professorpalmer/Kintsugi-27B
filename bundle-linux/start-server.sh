@@ -25,6 +25,9 @@
 #   KINTSUGI_MMPROJ        vision projector file (default models/mmproj-Qwen3.8-27B-Q8_0.gguf; an optional download)
 #   KINTSUGI_IMAGE_MAX_TOKENS  tokens for one image at most (default 2048; a larger image is scaled down to fit)
 #   KINTSUGI_THINK         medium (default) | off
+#   KINTSUGI_EFFORT        the default reasoning effort: medium (default) | xhigh | low. A request can set its own
+#                          ("reasoning_effort"); a word that is not xhigh, medium or low gets this default. xhigh thinks
+#                          longer and is slower (see README.md)
 #   KINTSUGI_READ          fast (default: int8 read of long prompts) | exact
 #   KINTSUGI_HEAD2         two-stage output head: exact candidates for each row (default 512; 0 = off)
 #   KINTSUGI_HOST          address clients connect to (default 127.0.0.1 = this computer only; 0.0.0.0 = your network:
@@ -64,6 +67,9 @@ BIN="$ROOT/bin"
 CTX="$(pick CTX 262144)"
 KV="$(pick KV q4_0)"
 THINK="$(pick THINK medium)"
+# Reasoning effort: the template accepts xhigh, medium and low (it stops with an error on any other word).
+EFFORT="$(pick EFFORT medium | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+case "$EFFORT" in medium|xhigh|low) ;; *) echo "KINTSUGI_EFFORT must be medium, xhigh or low (got '$EFFORT')"; exit 1 ;; esac
 # The CUDA runtime in bin/ sets the driver floor. This build uses CUDA 12.8, which needs driver 570 or newer.
 MIN_DRIVER=570
 if [ ! -f "$MODEL" ]; then
@@ -280,10 +286,11 @@ if [ -z "${GGML_ESCHA_PREFILL:-}" ]; then
   if [ "$READ" = exact ]; then export GGML_ESCHA_PREFILL=recon; else export GGML_ESCHA_PREFILL=i8; fi
 fi
 export GGML_ESCHA_I8_MIN_ROWS="${GGML_ESCHA_I8_MIN_ROWS:-256}"
+# The default effort of a request; a request can set its own with "reasoning_effort" (below: --reasoning-effort-allow).
 if [ "$THINK" = off ]; then
-  export LLAMA_ARG_CHAT_TEMPLATE_KWARGS='{"reasoning_effort":"medium","enable_thinking":false}'
+  export LLAMA_ARG_CHAT_TEMPLATE_KWARGS='{"reasoning_effort":"'"$EFFORT"'","enable_thinking":false}'
 else
-  export LLAMA_ARG_CHAT_TEMPLATE_KWARGS='{"reasoning_effort":"medium"}'
+  export LLAMA_ARG_CHAT_TEMPLATE_KWARGS='{"reasoning_effort":"'"$EFFORT"'"}'
 fi
 export LD_LIBRARY_PATH="$BIN${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"   # the engine and the CUDA runtime libraries are in bin/
 
@@ -321,7 +328,7 @@ SRV_HOST=$LISTEN; [ $USE_LAYER = 1 ] && SRV_HOST=127.0.0.1
 ARGS=(-m "$MODEL" -ngl 99 -c "$CTX" -fa on -np 1 -ub "$UB" --fit off --jinja
       -ctk "$KV" -ctv "$KV" --kv-vram-cells "$CELLS" --kq-mask-packed --cache-ram 4096
       --reasoning-budget 20480 -n 24576 --reasoning-budget-message "Now produce the complete answer."
-      --reasoning-effort-allow medium --reasoning-effort-fallback medium --reasoning-max-tokens-floor 24576
+      --reasoning-effort-allow xhigh,medium,low --reasoning-effort-fallback "$EFFORT" --reasoning-max-tokens-floor 24576
       --reasoning-max-tokens-honor 4096
       --host "$SRV_HOST" --port "$SERVER_PORT" ${SPEC[@]+"${SPEC[@]}"})
 [ "$TEMPLATE" != model ] && ARGS+=(--chat-template-file "$TEMPLATE")
@@ -342,7 +349,7 @@ echo "kv     $KV, tiered: cells 0..$CELLS in VRAM, $CELLS..$CTX in system RAM (f
 echo "template $([ "$TEMPLATE" = model ] && echo "the model file's own" || echo "$TEMPLATE")"
 [ "$HEAD2" -gt 0 ] && echo "head   two-stage: first stage q4_0 in VRAM, $HEAD2 exact candidates for each row from system RAM"
 case "$MODE" in off) SPEC_TXT=off ;; dflash) SPEC_TXT="DFlash2 draft 7 ($(basename "$DRAFTER"))" ;; *) SPEC_TXT="MTP draft $DRAFT + lookup" ;; esac
-echo "spec   $SPEC_TXT; thinking $THINK; read $GGML_ESCHA_PREFILL"
+echo "spec   $SPEC_TXT; thinking $THINK; effort $EFFORT; read $GGML_ESCHA_PREFILL"
 [ -n "$DRAFT_NOTE" ] && echo "$DRAFT_NOTE"
 if [ "$VISION" = off ]; then echo "vision off"; else echo "vision $VISION ($(basename "$MMPROJ")), up to $IMG_MAX tokens per image"; fi
 if [ $DRY = 1 ]; then echo "args   ${ARGS[*]}"; exit 0; fi

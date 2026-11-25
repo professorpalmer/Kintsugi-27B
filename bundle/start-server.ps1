@@ -1,7 +1,8 @@
 # Kintsugi-27B on one 12 GB NVIDIA card (RTX 20 / 30 / 40 / 50, H100): 262,144-token window, tiered K/V cache, MTP + lookup drafting.
 #
-#   powershell -ExecutionPolicy Bypass -File start-server.ps1 [-Port 8080] [-Wait] [-DryRun]
+#   powershell -ExecutionPolicy Bypass -File start-server.ps1 [-Port 8080] [-Effort medium] [-Wait] [-DryRun]
 #
+#   -Effort   the default reasoning effort: medium (default) | xhigh | low (the same as KINTSUGI_EFFORT; -Effort wins)
 #   -Wait     wait until the server answers, send one warm-up request, print the VRAM in use, then return
 #   -DryRun   print the settings and the server command line, start nothing
 #
@@ -23,6 +24,9 @@
 #   KINTSUGI_MMPROJ        vision projector file (default models\mmproj-Qwen3.8-27B-Q8_0.gguf; an optional download)
 #   KINTSUGI_IMAGE_MAX_TOKENS  tokens for one image at most (default 2048; a larger image is scaled down to fit)
 #   KINTSUGI_THINK         medium (default) | off
+#   KINTSUGI_EFFORT        the default reasoning effort: medium (default) | xhigh | low. A request can set its own
+#                          ("reasoning_effort"); a word that is not xhigh, medium or low gets this default. xhigh thinks
+#                          longer and is slower (see README.md)
 #   KINTSUGI_READ          fast (default: int8 read of long prompts) | exact
 #   KINTSUGI_HEAD2         two-stage output head: exact candidates for each row (default 512; 0 = off)
 #   KINTSUGI_HOST          address clients connect to (default 127.0.0.1 = this computer only; 0.0.0.0 = your network:
@@ -40,7 +44,7 @@
 #   KINTSUGI_CHAT_TEMPLATE chat template file (default templates\kintsugi.jinja: the model's template, except that a
 #                          system message after the first turn, as Claude Code sends, is accepted); "model" = the
 #                          template inside the model file; any other value = the path of your own template
-param([int]$Port = 8080, [switch]$Wait, [switch]$DryRun)
+param([int]$Port = 8080, [string]$Effort = '', [switch]$Wait, [switch]$DryRun)
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 function Pick($name, $default) {
@@ -88,6 +92,10 @@ $Bin = Join-Path $Root 'bin'
 $Ctx = [int](Pick 'CTX' 262144)
 $Kv = Pick 'KV' 'q4_0'
 $Think = Pick 'THINK' 'medium'
+# Reasoning effort: the template accepts xhigh, medium and low (it stops with an error on any other word).
+if (-not $Effort) { $Effort = Pick 'EFFORT' 'medium' }
+$Effort = $Effort.Trim().ToLower()
+if ($Effort -notin @('medium', 'xhigh', 'low')) { throw "KINTSUGI_EFFORT must be medium, xhigh or low (got '$Effort')" }
 if (-not (Test-Path $Model)) {
     Write-Host "Kintsugi-27B: model file not found: $Model"
     Write-Host "  Download Kintsugi-27B-12G.gguf from https://huggingface.co/CaryPalmer/Kintsugi-27B"
@@ -423,7 +431,8 @@ function Test-MtpRetry($why) {
     $Read = Pick 'READ' 'fast'
     if (-not $env:GGML_ESCHA_PREFILL) { $env:GGML_ESCHA_PREFILL = if ($Read -eq 'exact') { 'recon' } else { 'i8' } }
     if (-not $env:GGML_ESCHA_I8_MIN_ROWS) { $env:GGML_ESCHA_I8_MIN_ROWS = '256' }
-    $env:LLAMA_ARG_CHAT_TEMPLATE_KWARGS = if ($Think -eq 'off') { '{"reasoning_effort":"medium","enable_thinking":false}' } else { '{"reasoning_effort":"medium"}' }
+    # The default effort of a request; a request can set its own with "reasoning_effort" (below: --reasoning-effort-allow).
+    $env:LLAMA_ARG_CHAT_TEMPLATE_KWARGS = if ($Think -eq 'off') { "{`"reasoning_effort`":`"$Effort`",`"enable_thinking`":false}" } else { "{`"reasoning_effort`":`"$Effort`"}" }
     $env:PATH = "$Bin;" + $env:PATH          # the engine and the CUDA runtime DLLs are in bin\
 
     $KeyFile = Pick 'KEY_FILE' ''
@@ -468,7 +477,7 @@ function Test-MtpRetry($why) {
     $SrvArgs = @('-m', ('"' + $Model + '"'), '-ngl', '99', '-c', "$Ctx", '-fa', 'on', '-np', '1', '-ub', "$Ub", '--fit', 'off', '--jinja',
               '-ctk', $Kv, '-ctv', $Kv, '--kv-vram-cells', "$Cells", '--kq-mask-packed', '--cache-ram', "$CacheRam",
               '--reasoning-budget', '20480', '-n', '24576', '--reasoning-budget-message', '"Now produce the complete answer."',
-              '--reasoning-effort-allow', 'medium', '--reasoning-effort-fallback', 'medium', '--reasoning-max-tokens-floor', '24576', '--reasoning-max-tokens-honor', '4096',
+              '--reasoning-effort-allow', 'xhigh,medium,low', '--reasoning-effort-fallback', $Effort, '--reasoning-max-tokens-floor', '24576', '--reasoning-max-tokens-honor', '4096',
               '--host', $(if ($UseLayer) { '127.0.0.1' } else { $ListenHost }), '--port', "$ServerPort") + $Spec
     if ($Template -ne 'model') { $SrvArgs += @('--chat-template-file', ('"' + $Template + '"')) }
     if ($KeyFile) { $SrvArgs += @('--api-key-file', ('"' + $KeyFile + '"')) }
@@ -489,7 +498,7 @@ function Test-MtpRetry($why) {
     Write-Host "kv     $Kv, tiered: cells 0..$Cells in VRAM, $Cells..$Ctx in system RAM (free $($TotalMiB - $UsedMiB) MiB, reserved $ReservedMiB, ceiling $Ceiling, fixed $Fixed, growth $Growth, margin $Margin ($MarginWhy))"
     Write-Host "template $(if ($Template -eq 'model') { 'the model file''s own' } else { $Template })"
     if ($Head2 -gt 0) { Write-Host "head   two-stage: first stage q4_0 in VRAM, $Head2 exact candidates for each row from system RAM" }
-    Write-Host "spec   $(if ($Mode -eq 'off') { 'off' } elseif ($Mode -eq 'dflash') { "DFlash2 draft 7 ($(Split-Path $Drafter -Leaf))" } else { "MTP draft $Draft + lookup" }); thinking $Think; read $($env:GGML_ESCHA_PREFILL)"
+    Write-Host "spec   $(if ($Mode -eq 'off') { 'off' } elseif ($Mode -eq 'dflash') { "DFlash2 draft 7 ($(Split-Path $Drafter -Leaf))" } else { "MTP draft $Draft + lookup" }); thinking $Think; effort $Effort; read $($env:GGML_ESCHA_PREFILL)"
     if ($DraftNote) { Write-Host $DraftNote }
     Write-Host "vision $(if ($Vision -eq 'off') { 'off' } else { "$Vision ($(Split-Path $Mmproj -Leaf)), up to $ImgMax tokens per image" })"
     if ($DryRun) { Write-Host ("args   " + ($SrvArgs -join ' ')); exit 0 }
