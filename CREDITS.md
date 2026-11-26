@@ -108,6 +108,12 @@ measurements.
   layer and log findings fixed in v1.1.5; the Linux launcher patch (a missing-library check, and the layer stops when
   the server stops during the load).
 
+- **xgxx666**: the RTX 5070 report (#17) that led to the v1.1.7 fixes (the drafter load on a full card, the
+  system-memory checks).
+- **hyf03288**: the Ivy Bridge report (#21) with the exact diagnosis (the `shlx` fault in `ggml-cpu.dll` before the
+  first log line), the test of the AVX + F16C library on a real Xeon E3-1230 V2, and the saved-chat layer fix in
+  v1.2.1 (the layer now passes the web page's `x-conv*` headers, so a stream can be resumed).
+
 ## Citations
 
 DFlash 2 (Inco AI, 2026, https://inco.ai/blog/dflash2/) and DFlash: Block Diffusion for Flash Speculative Decoding

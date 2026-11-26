@@ -283,10 +283,17 @@ def apply_cards(body, msgs):
     return msgs, 0
 
 
+class UpstreamDown(Exception):
+    """The request did not reach the server (refused, reset, timed out at connect). args[0] = the 503 body (JSON)."""
+
+
 class QuietServer(http.server.ThreadingHTTPServer):
     """A client that hangs up (a /health poll that timed out, a closed browser tab) is normal: one short log line, not
-    a traceback. Other errors keep the full traceback."""
+    a traceback. Other errors keep the full traceback.
+    On Windows, SO_REUSEADDR lets a second program bind a port that a running one listens on (both then get
+    connections), so there the layer binds without it: a busy port stops the start with "address in use"."""
     daemon_threads = True
+    allow_reuse_address = os.name != "nt"
 
     def handle_error(self, request, client_address):
         e = sys.exc_info()[1]
@@ -435,11 +442,51 @@ class Proxy(http.server.BaseHTTPRequestHandler):
     # Headers that a POST other than chat/completions sends up (harness gate 2026-11-20): the API key in either form
     # (Authorization, x-api-key), the body type, Accept, and the API version / feature headers of the Anthropic and
     # OpenAI clients (anthropic-version, anthropic-beta, openai-beta, ...). Nothing else (no Host, no cookies).
+    # x-conv*: the web page's x-conversation-id, under which the server keeps a live stream that the page can resume
+    # (GET /v1/stream?conv_id=...&from=N); also any later x-conv header (fix and form by hyf03288, issue #21).
     _NONCHAT_UP = ("authorization", "content-type", "accept", "x-api-key")
 
     def _nonchat_headers(self):
         return {k: v for k, v in self.headers.items()
-                if k.lower() in self._NONCHAT_UP or k.lower().startswith(("anthropic-", "openai-"))}
+                if k.lower() in self._NONCHAT_UP or k.lower().startswith(("anthropic-", "openai-", "x-conv"))}
+
+    def _chat_headers(self):
+        """Headers that a chat request sends up: the API key, the body type and the x-conv* headers."""
+        return {k: v for k, v in self.headers.items()
+                if k.lower() in ("authorization", "content-type") or k.lower().startswith("x-conv")}
+
+    _engine_ok_at = 0.0   # time of the server's last answer (any HTTP status); 0.0 = no answer since the layer started
+
+    def _up_open(self, req, timeout=7200):
+        """urlopen to the server. A refused connection (nothing reached the server, so a POST can go again) is tried
+        once more 0.5 s later; then UpstreamDown, with one log line that names the cause and no traceback. HTTP errors
+        pass through. (On Windows a refused connect itself takes about 2 s: the system tries it 3 times.)"""
+        for n in range(2):
+            try:
+                r = urllib.request.urlopen(req, timeout=timeout)
+            except urllib.error.HTTPError:
+                Proxy._engine_ok_at = time.time()
+                raise
+            except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as e:
+                reason = getattr(e, "reason", e)
+                if isinstance(reason, ConnectionRefusedError) and n == 0:
+                    time.sleep(0.5)
+                    continue
+                raise UpstreamDown(self._down_note(reason, n + 1)) from None
+            Proxy._engine_ok_at = time.time()
+            return r
+
+    def _down_note(self, reason, tries):
+        """One log line for a request that did not reach the server; returns the 503 body (JSON) for the client."""
+        name = type(reason).__name__
+        code = getattr(reason, "winerror", None) or getattr(reason, "errno", None)
+        seen = Proxy._engine_ok_at
+        when = ("the server last answered %.0f s ago" % (time.time() - seen)) if seen else \
+            "no answer from the server since the layer started"
+        self.log_message("server not reachable: %s %s -> %s: %s%s (%d %s); %s", self.command, self.path.split("?")[0],
+                         self.upstream, name, " [%s]" % code if code else "", tries, "try" if tries == 1 else "tries", when)
+        return json.dumps({"error": {"code": 503, "message": "the server is not ready (%s)" % name,
+                                     "type": "unavailable_error"}}).encode()
 
     def _forward_nonchat(self, raw):
         """A POST other than /v1/chat/completions (/v1/messages, /v1/responses, /completion, /tokenize, ...): sent up
@@ -452,9 +499,11 @@ class Proxy(http.server.BaseHTTPRequestHandler):
         with lock:
             req = urllib.request.Request(self.upstream + self.path, data=raw, method="POST", headers=self._nonchat_headers())
             try:
-                r = urllib.request.urlopen(req, timeout=7200)
+                r = self._up_open(req)
             except urllib.error.HTTPError as e:
                 return self._reply(e.code, e.headers.get("Content-Type", "application/json"), e.read())
+            except UpstreamDown as e:
+                return self._reply(503, "application/json", e.args[0])
             ctype = r.headers.get("Content-Type", "application/json")
             if "event-stream" not in ctype:
                 with r:
@@ -478,13 +527,15 @@ class Proxy(http.server.BaseHTTPRequestHandler):
                 r.close()
 
     def _forward_raw(self, method, body=None):
-        headers = {k: v for k, v in self.headers.items() if k.lower() in ("authorization", "content-type")}
+        headers = self._chat_headers()
         req = urllib.request.Request(self.upstream + self.path, data=body, method=method, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=7200) as r:
+            with self._up_open(req) as r:
                 return r.status, r.headers.get("Content-Type", "application/json"), r.read()
         except urllib.error.HTTPError as e:
             return e.code, e.headers.get("Content-Type", "application/json"), e.read()
+        except UpstreamDown as e:
+            return 503, "application/json", e.args[0]
 
     def _stream(self, method, body):
         """Relay a streamed (SSE) response as it arrives."""
@@ -499,12 +550,14 @@ class Proxy(http.server.BaseHTTPRequestHandler):
         return self._stream_plain(method, body)
 
     def _stream_plain(self, method, body):
-        headers = {k: v for k, v in self.headers.items() if k.lower() in ("authorization", "content-type")}
+        headers = self._chat_headers()
         req = urllib.request.Request(self.upstream + self.path, data=body, method=method, headers=headers)
         try:
-            r = urllib.request.urlopen(req, timeout=7200)
+            r = self._up_open(req)
         except urllib.error.HTTPError as e:
             return self._reply(e.code, e.headers.get("Content-Type", "application/json"), e.read())
+        except UpstreamDown as e:
+            return self._reply(503, "application/json", e.args[0])
         self.send_response(r.status)
         self.send_header("Content-Type", r.headers.get("Content-Type", "text/event-stream"))
         self.send_header("Cache-Control", "no-cache")
@@ -579,15 +632,21 @@ class Proxy(http.server.BaseHTTPRequestHandler):
         with self.slots.lock:
             try:
                 self._slots_check(body)
-                headers = {k: v for k, v in self.headers.items() if k.lower() in ("authorization", "content-type")}
+                headers = self._chat_headers()
                 req = urllib.request.Request(self.upstream + self.path, data=body, method=method, headers=headers)
                 try:
-                    r = urllib.request.urlopen(req, timeout=7200)
+                    r = self._up_open(req)
                 except urllib.error.HTTPError as e:
                     raw = e.read()
                     done.set()
                     t.join()
                     self.wfile.write(self._sse_error(e.code, raw))
+                    self.wfile.flush()
+                    return
+                except UpstreamDown as e:   # the server is not listening (loading, or stopped): its 503, one log line
+                    done.set()
+                    t.join()
+                    self.wfile.write(self._sse_error(503, e.args[0]))
                     self.wfile.flush()
                     return
                 except Exception as e:   # server gone (crash, restart): say so in the stream instead of a bare close
@@ -721,9 +780,9 @@ class Proxy(http.server.BaseHTTPRequestHandler):
 
     def _open_stream(self, body):
         self._slots_check(body)   # the interpreter-stream path holds the cache lock (see _chat)
-        headers = {k: v for k, v in self.headers.items() if k.lower() in ("authorization", "content-type")}
+        headers = self._chat_headers()
         req = urllib.request.Request(self.upstream + self.path, data=json.dumps(body).encode(), method="POST", headers=headers)
-        return urllib.request.urlopen(req, timeout=7200)
+        return self._up_open(req)
 
     def _stream_interpreter(self, body, client_tools, with_input=False, extra=None, stop_early=None):
         """The interpreter loop for a streamed request. Everything the model streams is relayed as it arrives except
@@ -762,6 +821,14 @@ class Proxy(http.server.BaseHTTPRequestHandler):
                         stop_early()
                         self.wfile.write(self._sse_error(e.code, e.read()))
                         self.wfile.flush()
+                    return
+                except UpstreamDown as e:   # the server is not listening (loading, or stopped)
+                    if not started:
+                        return self._reply(503, "application/json", e.args[0])
+                    if stop_early is not None:
+                        stop_early()
+                    self.wfile.write(self._sse_error(503, e.args[0]))
+                    self.wfile.flush()
                     return
                 except Exception as e:   # server gone (crash, restart)
                     if not started:
@@ -918,6 +985,7 @@ class Proxy(http.server.BaseHTTPRequestHandler):
         req = urllib.request.Request(self.upstream + self.path, method="GET", headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=7200) as r:
+                Proxy._engine_ok_at = time.time()
                 if "text/event-stream" in (r.headers.get("Content-Type") or ""):
                     # an SSE stream (the UI's resumed stream, /v1/stream): relay each chunk as it arrives
                     self.send_response(r.status)
@@ -935,11 +1003,15 @@ class Proxy(http.server.BaseHTTPRequestHandler):
                     return
                 status, rh, data = r.status, r.headers, r.read()
         except urllib.error.HTTPError as e:
+            Proxy._engine_ok_at = time.time()
             status, rh, data = e.code, e.headers, e.read()
         except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as e:
             # the server is not up yet (a /health poll while the model loads: refused or reset) or stopped: a short 503,
-            # as the server itself answers while it loads, and no traceback in the log
+            # as the server itself answers while it loads, and no traceback in the log. The cause goes to the log only
+            # when the server answered before (not for each poll during the load).
             reason = getattr(e, "reason", e)
+            if Proxy._engine_ok_at:
+                self._down_note(reason, 1)
             return self._reply(503, "application/json", json.dumps(
                 {"error": {"code": 503, "message": "the server is not ready (%s)" % type(reason).__name__,
                            "type": "unavailable_error"}}).encode())
@@ -1215,9 +1287,18 @@ if __name__ == "__main__":
     Proxy.finish_note = not a.no_finish_note
     Proxy.example_check = not a.no_example_check
     Proxy.strip_stray_tags = not a.no_strip_stray_tags
+    # The layer talks only to the server on this computer: no proxy (environment or Windows settings) for it. urlopen
+    # keeps the proxy settings of its first call for the life of the process, so a proxy set then would carry every
+    # request to the server port.
+    urllib.request.install_opener(urllib.request.build_opener(urllib.request.ProxyHandler({})))
     Proxy.slots = slot_cache.SlotCache.from_env(a.upstream)
     if Proxy.slots:
         print(f"bonsai layer: saved conversations in {Proxy.slots.folder} ({len(Proxy.slots.index)} on disk)", flush=True)
-    srv = QuietServer((a.host, a.port), Proxy)
+    try:
+        srv = QuietServer((a.host, a.port), Proxy)
+    except OSError as e:   # the port is taken (another layer, or another program): say so, no traceback
+        print(f"bonsai layer: can not listen on {a.host}:{a.port}: {e.strerror or e} (another program, or a layer "
+              f"that is still running, uses this port: stop it, or start on another port)", file=sys.stderr, flush=True)
+        sys.exit(1)
     print(f"bonsai layer on {a.host}:{a.port} -> {a.upstream}", flush=True)
     srv.serve_forever()

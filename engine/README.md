@@ -22,7 +22,7 @@ The source of each release build is a release asset. Licence: MIT, the same as l
 
 | Engine | Bundles | Source asset | sha256 |
 |---|---|---|---|
-| `7d9bb6296` | v1.1.7 and v1.2 (Windows and Linux) | `Kintsugi-27B-v1.1.7-engine-src-7d9bb6296.tar.gz` (43,086,685 bytes) | `7e0e727c66095394a38600d32f6dc737e93c0ec98272bb5c649be763e5602039` |
+| `7d9bb6296` | v1.1.7, v1.2 and v1.2.1 (Windows and Linux) | `Kintsugi-27B-v1.1.7-engine-src-7d9bb6296.tar.gz` (43,086,685 bytes) | `7e0e727c66095394a38600d32f6dc737e93c0ec98272bb5c649be763e5602039` |
 | `8f12baacf` | v1.1.6 (Windows and Linux) | `Kintsugi-27B-v1.1.6-engine-src-8f12baacf.tar.gz` (43,075,805 bytes) | `c1c7812e1193f5604ee243cead1b269d49d160d72e1accb2b5564bc0d4081d1d` |
 | `d512c2d77` | v1.1.5 (Windows and Linux) | `Kintsugi-27B-v1.1.5-engine-src-d512c2d77.tar.gz` (43,085,588 bytes) | `488b500da95dbffb0a9845d2661027fcb374c153a6675debb8765a78942c63fa` |
 | `b9c5b427d` | v1.1.2 to v1.1.4 (Windows and Linux) | `Kintsugi-27B-v1.1.2-engine-src-b9c5b427d.tar.gz` (43,067,633 bytes) | `ebc9780d37977b077b190b172a6123e60d25cd6b439222e03a910c3d280427b0` |
@@ -79,6 +79,13 @@ cmake --build build --target llama-server llama-perplexity test-backend-ops
 - **One GPU family only:** set `CMAKE_CUDA_ARCHITECTURES` to it, for example `75-real` (RTX 20), `86-real` (RTX 30),
   `89-real` (RTX 40), `90-real` (H100) or `120-real` (RTX 50).
 - **CUDA toolkit:** 12.2 or newer; 12.8 or newer for RTX 50. The Windows bundle uses CUDA 13, the Linux bundle 12.8.
+- **AVX CPU library (v1.2.1, #21):** with `GGML_NATIVE=OFF` the CPU library is built for AVX2 + FMA + BMI2 + F16C.
+  The bundles also carry a second build of the same source (target `ggml-cpu` only) for CPUs with AVX + F16C and no
+  AVX2. Linux (GCC): add `-DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF` (AVX, F16C and SSE4.2 stay on); the file is
+  `bin/cpu-avx/libggml-cpu.so.0`. Windows (MSVC): add `-DGGML_AVX=ON -DGGML_AVX2=OFF -DGGML_BMI2=OFF -DGGML_AVX512=OFF
+  -DGGML_AVX_VNNI=OFF` and set `CFLAGS` and `CXXFLAGS` to `/D__F16C__ /DGGML_F16C /d2Qvec-sse2only` at the first
+  configure (MSVC has no F16C option; without `/d2Qvec-sse2only` the MSVC 14.44 auto-vectorizer put 4 AVX2
+  instructions into the `/arch:AVX` build); the file is `bin\ggml-cpu-avx.dll`.
 
 ## NVIDIA driver
 

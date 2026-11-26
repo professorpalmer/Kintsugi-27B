@@ -47,14 +47,15 @@ bandwidth of the RTX 4070, so decode is about half as fast. 16 GB of system RAM 
    `ready  http://127.0.0.1:8080/v1`.
 4. Open http://127.0.0.1:8080/, or point an OpenAI-compatible app or coding harness at `http://127.0.0.1:8080/v1`.
 
-You need NVIDIA driver 580 or newer. Full guide: [bundle/README.md](bundle/README.md).
+You need NVIDIA driver 580 or newer and a CPU with AVX2, or with AVX + F16C (Intel 2012 or newer: the launcher
+picks the matching CPU library by itself, v1.2.1). Full guide: [bundle/README.md](bundle/README.md).
 
 - **Reasoning effort (v1.2, optional):** `KINTSUGI_EFFORT` = `medium` (default), `xhigh` or `low`; on Windows also
   `-Effort xhigh` ([details](bundle/README.md#reasoning-effort-optional)).
 - **Saved chats** go to `slots`, up to 20 GB by default (`KINTSUGI_SLOT_CACHE_GB`). Move them with
   `KINTSUGI_SLOT_SAVE_PATH`. Turn saving off with `KINTSUGI_LAYER=0`.
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.2-linux-x86_64.tar.gz` from Releases, unpack it with `tar -xzf`, put the
+**Linux (x86_64):** download `Kintsugi-27B-v1.2.1-linux-x86_64.tar.gz` from Releases, unpack it with `tar -xzf`, put the
 model in `models/` and run `./start-server.sh --wait`. Needs NVIDIA driver 570+ and glibc 2.34+ (Ubuntu 22.04 / 24.04),
 no other libraries. Guide: [bundle-linux/README.md](bundle-linux/README.md).
 
@@ -67,6 +68,8 @@ and M1 to M4 are not. Guide: [mac/README.md](mac/README.md).
 
 - **NVIDIA RTX 20 / 30 / 40 / 50 and H100 / H200** with 12 GB or more (RTX 50 and H100 from v1.1.2). One download for
   all; CUDA loads only your card's code, so the rest costs no VRAM or speed.
+- **CPU:** AVX2 (Intel Haswell 2013 / AMD Zen or newer), or AVX + F16C (for example Intel Ivy Bridge 2012) with the
+  second CPU library that the launchers pick by themselves (v1.2.1, #21). The GPU does nearly all of the work.
 - **Apple Silicon Macs:** see [mac/](mac/README.md). **AMD (ROCm / HIP):** in progress. **Intel GPUs:** not yet.
 - The file needs our engine (a llama.cpp fork, in every bundle). Stock llama.cpp, Ollama and LM Studio cannot load it.
 

@@ -37,6 +37,8 @@
 #   KINTSUGI_SLOT_CACHE_GB   size limit of that folder in GB (default 20; the oldest files are removed past it)
 #   KINTSUGI_CACHE_RAM     MiB of system RAM for the server's prompt cache (default 4096; 0 = off)
 #   KINTSUGI_GPU_COUNTERS  1 (default) = count the VRAM that other programs hold (Windows GPU memory counters); 0 = nvidia-smi only
+#   KINTSUGI_CPU           auto (default: the CPU library that this CPU can run, checked at the first start) | avx2 |
+#                          avx (the AVX + F16C library, for CPUs without AVX2, for example Intel Ivy Bridge)
 #   KINTSUGI_UB            micro-batch for prompt reads (default 1024; 512 saves about 146 MiB and reads 8-13 % slower)
 #   KINTSUGI_ALIAS         the model name that /v1/models lists and replies carry (default kintsugi; an --alias in
 #                          KINTSUGI_EXTRA wins)
@@ -63,9 +65,28 @@ function Get-NoGpuMessage($LogPath) {
     $null
 }
 # The server stopped during the load: stop the layer too (no layer with no server behind it), print the last lines of the
-# server log, exit 1.
+# server log, exit 1. A server that stopped at once with an empty log never ran (a Windows loader or CPU fault): then
+# the message points to the Windows event log and names the exit code.
+function Test-NotStarted {
+    if (-not ($p -and $p.HasExited)) { return $false }
+    $len = 0; foreach ($f in $log, ($log + '.out')) { if (Test-Path $f) { $len += (Get-Item $f).Length } }
+    $len -eq 0 -and $p.ExitTime -and (($p.ExitTime - $p.StartTime).TotalSeconds -lt 15)
+}
 function Stop-LoadFailed {
     if ($lp -and -not $lp.HasExited) { Stop-Process -Id $lp.Id -Force -ErrorAction SilentlyContinue; try { $lp.WaitForExit(10000) | Out-Null } catch { } }
+    if (Test-NotStarted) {
+        $code = try { [int]$p.ExitCode } catch { $null }
+        $hex = if ($null -ne $code) { '0x{0:X8}' -f $code } else { 'unknown' }
+        Write-Host "the process did not start (log 0 bytes, it stopped at once, exit code $hex): see the Windows event log"
+        Write-Host "  (Event Viewer > Windows Logs > Application, source 'Application Error'; or in PowerShell:"
+        Write-Host "   Get-WinEvent -LogName Application -MaxEvents 30 | Where-Object { `$_.Message -match 'llama-server' } | Format-List TimeCreated, Message)"
+        if ($hex -eq '0xC000001D') {
+            Write-Host "  0xC000001D = illegal instruction: this CPU lacks an instruction of the CPU library in bin\. $(if ((Get-CpuLibrary) -eq 'avx') { 'The AVX library is in use, so the CPU lacks AVX or F16C.' } else { 'Start again with KINTSUGI_CPU=avx (the AVX + F16C library).' })"
+        } elseif ($hex -eq '0xC0000135') {
+            Write-Host "  0xC0000135 = a DLL was not found: install the Microsoft Visual C++ Redistributable 2015-2022 (x64), or unzip the bundle again."
+        }
+        exit 1
+    }
     Write-Host "server stopped during load: see $log"
     Get-Content -LiteralPath $log -Tail 3 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
     exit 1
@@ -145,6 +166,78 @@ if ($Cc -match '^(\d+)\.(\d+)$') {
     }
 } else {
     Write-Host "WARN   could not read the card's compute capability from nvidia-smi: the card check is skipped"
+}
+
+# ---- CPU (issue #21): bin\ggml-cpu.dll is built for AVX2 + FMA + BMI2 (Intel Haswell 2013 / AMD Zen 2017 or newer);
+# ---- bin\ggml-cpu-avx.dll for AVX + F16C (Intel Ivy Bridge 2012 or newer). At the first start (and when the CPU is a
+# ---- different one) the launcher runs `llama-server.exe --version` once: when it stops with 0xC000001D (illegal
+# ---- instruction), the launcher puts the AVX library in place (two renames in bin\) and checks again. The result is in
+# ---- bin\cpu-library.txt. KINTSUGI_CPU=auto (default) | avx2 | avx sets the library without the check.
+# The GPU does nearly all of the work, so the speed is about the same with either library.
+# KINTSUGI_TEST_CPU_SDE=<path of Intel SDE's sde.exe> runs the check under `sde -ivb` (an emulated Ivy Bridge CPU; tests).
+$CpuName = "$((Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1).Name)".Trim() -replace '\s+', ' '
+$CpuWant = (Pick 'CPU' 'auto').Trim().ToLower()
+if ($CpuWant -notin @('auto', 'avx2', 'avx')) { throw "KINTSUGI_CPU must be auto, avx2 or avx (got '$CpuWant')" }
+$CpuMark = Join-Path $Bin 'cpu-library.txt'
+# which build bin\ggml-cpu.dll is now: the other build is next to it under its own name
+function Get-CpuLibrary { if (Test-Path (Join-Path $Bin 'ggml-cpu-avx2.dll')) { 'avx' } else { 'avx2' } }
+function Set-CpuLibrary([string]$To) {
+    $now = Get-CpuLibrary
+    if ($To -eq $now) { return $true }
+    $cur = Join-Path $Bin 'ggml-cpu.dll'; $keep = Join-Path $Bin "ggml-cpu-$now.dll"; $new = Join-Path $Bin "ggml-cpu-$To.dll"
+    if (-not (Test-Path $new)) { Write-Host "the CPU library $new is missing (unzip the bundle again)"; exit 1 }
+    if (@(Get-Process llama-server -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$Bin\*" }).Count) {
+        Write-Host "a llama-server from this folder is running: stop it first (stop.ps1), then start again"; exit 1
+    }
+    try { Move-Item -LiteralPath $cur -Destination $keep -ErrorAction Stop } catch { return $false }
+    try { Move-Item -LiteralPath $new -Destination $cur -ErrorAction Stop } catch {
+        Move-Item -LiteralPath $keep -Destination $cur -ErrorAction SilentlyContinue; return $false
+    }
+    $true
+}
+function Test-CpuLibrary {
+    # 'ok' | 'illegal' (the CPU lacks an instruction of bin\ggml-cpu.dll) | 'other <exit code>'
+    $exe = Join-Path $Bin 'llama-server.exe'; $sde = Pick 'TEST_CPU_SDE' ''
+    $o = Join-Path $env:TEMP "kintsugi-cpu-check-$PID.out"; $e = Join-Path $env:TEMP "kintsugi-cpu-check-$PID.err"
+    if ($sde) { $f = $sde; $al = @('-ivb', '--', ('"' + $exe + '"'), '--version') } else { $f = $exe; $al = @('--version') }
+    $pr = Start-Process -FilePath $f -ArgumentList $al -WorkingDirectory $Bin -WindowStyle Hidden -PassThru -RedirectStandardOutput $o -RedirectStandardError $e
+    $null = $pr.Handle   # Windows PowerShell 5.1 keeps the exit code only when the handle was read
+    if (-not $pr.WaitForExit(120000)) { Stop-Process -Id $pr.Id -Force -ErrorAction SilentlyContinue; return 'other timeout' }
+    $pr.WaitForExit()
+    $code = [int]$pr.ExitCode
+    $text = (Get-Content -Raw -LiteralPath $e -ErrorAction SilentlyContinue) + (Get-Content -Raw -LiteralPath $o -ErrorAction SilentlyContinue)
+    Remove-Item -LiteralPath $o, $e -ErrorAction SilentlyContinue
+    if ($code -eq -1073741795 -or ($sde -and $text -match 'not valid for specified chip')) { return 'illegal' }   # 0xC000001D
+    if ($code -eq 0) { return 'ok' }
+    'other 0x{0:X8}' -f $code
+}
+$NoWrite = "the launcher can not rename files in $Bin (no write rights there?). Copy bin\ggml-cpu-avx.dll over bin\ggml-cpu.dll by hand (keep the old file as bin\ggml-cpu-avx2.dll), or move the Kintsugi folder to a place where you can write, then start again."
+if ($CpuWant -ne 'auto') {
+    if (-not $DryRun -and -not (Set-CpuLibrary $CpuWant)) { Write-Host $NoWrite; exit 1 }
+    $CpuUse = $CpuWant
+} else {
+    $mark = if (Test-Path $CpuMark) { @(Get-Content -LiteralPath $CpuMark -ErrorAction SilentlyContinue) } else { @() }
+    $CpuUse = Get-CpuLibrary
+    if (-not $DryRun -and -not ($mark.Count -ge 2 -and $mark[1] -eq $CpuName -and $mark[0] -eq $CpuUse)) {
+        # first start on this CPU: the AVX2 library first, the AVX library when the CPU lacks an AVX2-build instruction
+        if (-not (Set-CpuLibrary 'avx2')) { Write-Host $NoWrite; exit 1 }
+        $r = Test-CpuLibrary
+        if ($r -eq 'illegal') {
+            if (-not (Set-CpuLibrary 'avx')) { Write-Host $NoWrite; exit 1 }
+            $r = Test-CpuLibrary
+            if ($r -eq 'illegal') {
+                $null = Set-CpuLibrary 'avx2'
+                Write-Host "This CPU ($CpuName) lacks AVX or F16C: the engine needs at least AVX + F16C (Intel Ivy Bridge 2012 / AMD 2012 or newer). Kintsugi-27B can not run on it."
+                exit 1
+            }
+        }
+        $CpuUse = Get-CpuLibrary
+        # only a check that ran to its end is kept (another result: check again at the next start)
+        if ($r -eq 'ok') { try { Set-Content -LiteralPath $CpuMark -Value @($CpuUse, $CpuName) -Encoding ASCII -ErrorAction Stop } catch { } }
+    }
+}
+if ($CpuUse -eq 'avx') {
+    Write-Host "cpu    ${CpuName}: $(if ($CpuWant -eq 'avx') { 'KINTSUGI_CPU=avx' } else { 'no AVX2 / FMA / BMI2' }), so the engine uses its AVX + F16C CPU library (the AVX2 one is kept as bin\ggml-cpu-avx2.dll). The GPU does nearly all of the work; the speed is about the same."
 }
 
 # ---- VRAM line: how many K/V cells fit in VRAM; the rest of the window lives in system RAM -----------------------------
@@ -507,6 +600,7 @@ function Test-MtpRetry($why) {
     $log = Join-Path $logs "server-$Port.log"
     $p = Start-Process -FilePath (Join-Path $Bin 'llama-server.exe') -ArgumentList ($SrvArgs -join ' ') -WorkingDirectory $Bin `
         -RedirectStandardOutput ($log + '.out') -RedirectStandardError $log -WindowStyle Hidden -PassThru
+    $null = $p.Handle   # Windows PowerShell 5.1 keeps the exit code of a -PassThru process only when its handle was read
     Write-Host "pid    $($p.Id)   log $log"
     $lp = $null
     $layerLog = Join-Path $logs "layer-$Port.log"
@@ -587,7 +681,8 @@ function Test-MtpRetry($why) {
                 Write-Host "ready  http://127.0.0.1:$Port/v1"; exit 0
             }
             if ($p.HasExited) { $m = Get-NoGpuMessage $log; if ($m) { Stop-NoGpu $m }
-                if (Test-MtpRetry 'the server stopped during the load') { continue launch }
+                Start-Sleep -Milliseconds 500   # the redirected log files are complete once the process is gone
+                if (-not (Test-NotStarted) -and (Test-MtpRetry 'the server stopped during the load')) { continue launch }
                 Stop-LoadFailed }
             if ($lp -and $lp.HasExited) { Write-Host "layer stopped: see $layerLog"; exit 1 }
             Start-Sleep 2
