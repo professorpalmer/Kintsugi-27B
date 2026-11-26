@@ -82,6 +82,22 @@ https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF and put it in `models/`. The la
 Images work in chat requests (OpenAI and Anthropic formats) and in tool results (for example a screenshot). The
 built-in web page is not tested with images.
 
+## Reasoning effort (optional)
+
+The model thinks before it answers. The reasoning effort sets how much it thinks. The default is `medium`. The
+model accepts three values: `xhigh`, `medium` and `low`.
+
+- **For all requests:** start with `KINTSUGI_EFFORT=xhigh ./start-server.sh --wait`. The `spec` line shows the effort.
+- **For one request:** send `"reasoning_effort": "xhigh"` (or `"chat_template_kwargs": {"reasoning_effort": "xhigh"}`).
+  `"reasoning_effort": "none"` turns the thinking off for that request. Any other word (for example `"high"`, which
+  some apps send) gets the default of the launcher. The request does not fail; the server log shows a line for it.
+- **What we measured:** on 70 tasks of an agent benchmark (AppWorld), `xhigh` gave 3 answers that the task did not
+  ask for, `medium` gave 13 (p = 0.013).
+- **What it costs:** with `xhigh` the thinking is longer, and each task took about 1.7 times as long. A few more tasks
+  stopped early (the model gave up, or the window was full). For this reason the default stays `medium`. We did not
+  measure `low`.
+- **Saved chats:** the effort changes the start of the prompt. A saved chat is used again only with the same effort.
+
 ## How to chat
 
 - **In the browser:** open http://127.0.0.1:8080/.
