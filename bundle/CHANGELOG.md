@@ -5,6 +5,38 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.2.1 (2026-11-26)
+
+- The same model file (sha256 `0510bae8...`) and the same engine source (`7d9bb6296`) as v1.2. From the report, the
+  test and the layer fix of hyf03288 (#21).
+- **Older CPUs (no AVX2).** The engine's CPU library (`ggml-cpu.dll`, Linux `libggml-cpu.so.0`) is built for AVX2 +
+  FMA + BMI2. On an Intel Ivy Bridge CPU (for example a Xeon E3-1230 V2) it stopped in its start-up code with an
+  illegal instruction, before the server wrote a log line. The bundles now also carry a second build of the same
+  source for AVX + F16C (Intel 2012 or newer): `bin\ggml-cpu-avx.dll` (Windows) and `bin/cpu-avx/libggml-cpu.so.0`
+  (Linux). The Windows launcher checks the CPU at the first start (one `llama-server.exe --version` run; the result is
+  in `bin\cpu-library.txt`) and, when the CPU lacks an instruction, puts the AVX library in place by itself. The Linux
+  launcher reads the CPU flags and puts `bin/cpu-avx` first on the library path. One `cpu` line says so; on a CPU with
+  AVX2 nothing changes. `KINTSUGI_CPU=avx2` or `avx` sets the library. The GPU does nearly all of the work: on an RTX
+  4070 the decode speed was the same with both libraries (69.7 and 69.6 tokens/s), and the reporter measured 39.4
+  tokens/s on an RTX 4060 Ti 16 GB with an E3-1230 V2.
+- **"The process did not start".** When the server stops at once with an empty log, the launcher now says so, with
+  the exit code (Windows: see the Windows event log; `0xC000001D` = illegal instruction, `0xC0000135` = a missing
+  DLL), and does not start again with MTP + lookup (the same cause would stop that start too).
+- **Saved-chat layer: the web page can resume a stream again.** The page sends an `x-conversation-id` header, and the
+  server keeps the live stream under it (`GET /v1/stream?conv_id=...&from=N`). The layer sent only the API key and
+  the body type to the server, so the page's resume request got a 404 ("Stream connection lost and could not be
+  resumed"). It now passes every header whose name starts with `x-conv` (hyf03288's fix).
+- **Layer while the server loads.** A request that can not reach the server (refused while the model loads) now
+  gets a 503 and one log line with the cause, not a traceback; a refused connection is tried once more after 0.5 s.
+  The layer connects to the server directly (it ignores a proxy that is set for this computer), and on Windows a
+  second layer can no longer listen on a port that a running layer uses (it stops with a clear message).
+- Checked on Windows (RTX 4070) and Linux (RTX 3060): with the default settings on an AVX2 CPU the launcher prints
+  the same settings and gives the same server flags as v1.2, and the outputs are the same (50 of 50 reference prompts
+  token-identical); with the AVX library also 50 of 50. The resume test through the layer (`from=0` and `from=400`):
+  404 with v1.2, 200 with v1.2.1. With Intel's CPU emulator set to Ivy Bridge, the v1.2 library stops in its start-up
+  code and the AVX library runs; on Windows the launcher's first-start check under the emulator chose the AVX library
+  by itself. The reporter ran the AVX library on a real E3-1230 V2.
+
 ## v1.2 (2026-11-25)
 
 - The same model file (sha256 `0510bae8...`) and the same engine (`7d9bb6296`) as v1.1.7: download only the new

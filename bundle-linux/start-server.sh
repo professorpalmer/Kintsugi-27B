@@ -36,6 +36,8 @@
 #   KINTSUGI_LAYER         1 (default) = saved conversations through the layer (needs Python 3.10+); 0 = plain server
 #   KINTSUGI_SLOT_SAVE_PATH  folder of the saved conversations (default slots/ in this folder)
 #   KINTSUGI_SLOT_CACHE_GB   size limit of that folder in GB (default 20; the oldest files are removed past it)
+#   KINTSUGI_CPU           auto (default: the CPU library that this CPU can run) | avx2 | avx (the AVX + F16C library,
+#                          for CPUs without AVX2, for example Intel Ivy Bridge)
 #   KINTSUGI_UB            micro-batch for prompt reads (default 1024; 512 saves about 146 MiB and reads 8-13 % slower)
 #   KINTSUGI_ALIAS         the model name that /v1/models lists and replies carry (default kintsugi; an --alias in
 #                          KINTSUGI_EXTRA wins)
@@ -124,6 +126,34 @@ if [[ "$CC" =~ ^([0-9]+)\.([0-9]+)$ ]]; then
   fi
 else
   echo "WARN   could not read the card's compute capability from nvidia-smi: the card check is skipped"
+fi
+
+# ---- CPU (issue #21): bin/libggml-cpu.so.0 is built for AVX2 + FMA + BMI2 + F16C (Intel Haswell 2013 / AMD Zen 2017 or
+# ---- newer); bin/cpu-avx/libggml-cpu.so.0 for AVX + F16C (Intel Ivy Bridge 2012 or newer). On a CPU without AVX2, FMA
+# ---- or BMI2 the launcher puts bin/cpu-avx first on LD_LIBRARY_PATH (no file in bin/ changes). The GPU does nearly all
+# ---- of the work, so the speed is about the same. KINTSUGI_CPU=auto (default) | avx2 | avx; KINTSUGI_TEST_CPU_FLAGS
+# ---- replaces the flags line of /proc/cpuinfo (tests).
+CPU_NAME="$(grep -m1 '^model name' /proc/cpuinfo 2> /dev/null | cut -d: -f2- | sed 's/^ *//; s/  */ /g')"
+CPU_FLAGS=" $(pick TEST_CPU_FLAGS "$(grep -m1 '^flags' /proc/cpuinfo 2> /dev/null | cut -d: -f2-)") "
+has_flag() { case "$CPU_FLAGS" in *" $1 "*) return 0 ;; esac; return 1; }
+CPU_WANT="$(pick CPU auto | tr '[:upper:]' '[:lower:]')"
+case "$CPU_WANT" in
+  auto)
+    if [ -z "${CPU_FLAGS// /}" ]; then CPU_LIB=avx2   # no flags to read: keep the default library
+    elif has_flag avx2 && has_flag fma && has_flag bmi2 && has_flag f16c; then CPU_LIB=avx2
+    elif has_flag avx && has_flag f16c; then CPU_LIB=avx
+    else
+      echo "This CPU (${CPU_NAME:-unknown}) lacks AVX or F16C: the engine needs at least AVX + F16C (Intel Ivy Bridge 2012 / AMD 2012 or newer). Kintsugi-27B can not run on it."
+      exit 1
+    fi ;;
+  avx2|avx) CPU_LIB=$CPU_WANT ;;
+  *) echo "KINTSUGI_CPU must be auto, avx2 or avx (got '$CPU_WANT')"; exit 1 ;;
+esac
+CPU_PATH=""
+if [ "$CPU_LIB" = avx ]; then
+  [ -f "$BIN/cpu-avx/libggml-cpu.so.0" ] || { echo "the CPU library $BIN/cpu-avx/libggml-cpu.so.0 is missing (unpack the bundle again)"; exit 1; }
+  CPU_PATH="$BIN/cpu-avx:"
+  echo "cpu    ${CPU_NAME:-this CPU}: $([ "$CPU_WANT" = avx ] && echo KINTSUGI_CPU=avx || echo "no AVX2 / FMA / BMI2"), so the engine uses its AVX + F16C CPU library (bin/cpu-avx/). The GPU does nearly all of the work; the speed is about the same."
 fi
 
 # A driver the runtime cannot use (or no CUDA device) does not stop the engine: it runs on the CPU, very slowly, and still
@@ -292,7 +322,7 @@ if [ "$THINK" = off ]; then
 else
   export LLAMA_ARG_CHAT_TEMPLATE_KWARGS='{"reasoning_effort":"'"$EFFORT"'"}'
 fi
-export LD_LIBRARY_PATH="$BIN${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"   # the engine and the CUDA runtime libraries are in bin/
+export LD_LIBRARY_PATH="$CPU_PATH$BIN${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"   # the engine and the CUDA runtime libraries are in bin/
 
 KEY_FILE="$(pick KEY_FILE '')"
 LISTEN="$(pick HOST 127.0.0.1)"
@@ -373,6 +403,21 @@ if [ $USE_LAYER = 1 ]; then
 fi
 echo "stop   $ROOT/stop.sh"
 alive() { kill -0 "$1" 2> /dev/null; }
+SP_T0=$(date +%s)
+not_started() {   # not_started: the server stopped within 15 s with an empty log (it never ran: a loader or CPU fault)
+  local n=0 f
+  for f in "$LOG" "$LOG.out"; do [ -f "$f" ] && n=$((n + $(stat -c %s "$f" 2> /dev/null || echo 1))); done
+  [ "$n" = 0 ] && [ $(( $(date +%s) - SP_T0 )) -lt 15 ]
+}
+not_started_message() {
+  local st=0
+  wait "$SP" 2> /dev/null; st=$?
+  echo "the process did not start (log 0 bytes, it stopped at once, exit status $st)"
+  if [ "$st" = 132 ]; then
+    if [ "$CPU_LIB" = avx ]; then echo "  132 = illegal instruction: the AVX library is in use, so this CPU lacks AVX or F16C."
+    else echo "  132 = illegal instruction: this CPU lacks an instruction of the CPU library in bin/. Start again with KINTSUGI_CPU=avx (the AVX + F16C library)."; fi
+  fi
+}
 stop_both() {   # stop the server and the layer, then wait until they are gone
   local x i
   for x in ${LP:-} $SP; do alive "$x" && kill "$x" 2> /dev/null; done
@@ -407,6 +452,7 @@ if [ $WAIT = 0 ]; then
   M="$(no_gpu_message "$LOG")"; [ -n "$M" ] && stop_no_gpu "$M"
   if ! alive "$SP"; then
     [ -n "$LP" ] && kill "$LP" 2> /dev/null   # do not leave the layer running with no server behind it
+    if not_started; then not_started_message; exit 1; fi
     echo "server stopped during load: see $LOG"; tail -n 3 "$LOG" | sed 's/^/  /'; exit 1
   fi
   exit 0
@@ -456,6 +502,10 @@ for i in $(seq 1 150); do
   fi
   if ! alive "$SP"; then
     M="$(no_gpu_message "$LOG")"; [ -n "$M" ] && stop_no_gpu "$M"
+    if not_started; then   # the same cause would stop a DFlash2 -> MTP retry too: no retry
+      [ -n "$LP" ] && kill "$LP" 2> /dev/null
+      not_started_message; exit 1
+    fi
     retry_mtp "the server stopped during the load"
     [ -n "$LP" ] && kill "$LP" 2> /dev/null   # do not leave the layer running with no server behind it
     echo "server stopped during load: see $LOG"; tail -n 3 "$LOG" | sed 's/^/  /'; exit 1

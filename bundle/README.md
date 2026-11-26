@@ -22,6 +22,10 @@ end). Pull requests are welcome.
     the results are the same within 1 % ([cross-architecture](../research/cross-architecture/README.md)).
 - NVIDIA driver 580 or newer (the bundle carries its own CUDA 13 runtime). The launcher stops with a message if the
   driver is too old.
+- A 64-bit CPU with AVX2 (Intel Haswell, 2013, or newer; AMD Excavator / Zen or newer). An older CPU with
+  AVX and F16C (Intel Ivy Bridge, 2012, for example a Xeon E3-1200 v2) also works: the launcher sees it at the
+  first start and uses the second CPU library, bin\ggml-cpu-avx.dll (v1.2.1; `KINTSUGI_CPU=avx` forces it). The
+  GPU does nearly all of the work, so the speed is about the same. A CPU without AVX can not run the engine.
 - Windows 10 or 11, 64-bit. 32 GB of system RAM or more is best for very long chats.
 - About 11 GB of disk for the model, plus room for saved chats (up to 20 GB, in `slots\`).
 - Optional: Python 3.10 or newer, for saved chats (see below). No extra Python packages are needed.

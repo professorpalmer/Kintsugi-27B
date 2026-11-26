@@ -34,6 +34,10 @@ Every tensor that is not a coded projection comes from Qwen's BF16 release.
 Only the Kintsugi engine (see [engine/](../engine/README.md)), which is in the bundle. Stock llama.cpp, Ollama and LM
 Studio cannot load it: they do not have the Escha op.
 
+CPU: the engine's default CPU library needs AVX2 (Intel Haswell 2013 / AMD Zen or newer). From v1.2.1 the bundles
+also carry an AVX + F16C library (Intel Ivy Bridge 2012 or newer), which the launchers use by themselves on a CPU
+without AVX2. The GPU does nearly all of the work, so the speed is about the same.
+
 ## The parameter count on Hugging Face
 
 Hugging Face counts the elements of the tensors in the file and shows about 7B. The coded tensors store packed 2-bit

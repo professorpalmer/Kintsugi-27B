@@ -17,6 +17,10 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
   have no code in the bundle: the launcher says so and stops.
 - NVIDIA driver 570 or newer. The engine uses the CUDA 12.8 runtime (in `bin/`). On drivers older than the 580
   family, the engine uses another type of pinned system memory for the long context, and writes one WARN line about it.
+- A 64-bit CPU with AVX2 (Intel Haswell, 2013, or newer; AMD Excavator / Zen or newer). An older CPU with
+  AVX and F16C (Intel Ivy Bridge, 2012, for example a Xeon E3-1200 v2) also works: the launcher sees it and
+  uses the second CPU library, bin/cpu-avx/libggml-cpu.so.0 (v1.2.1; `KINTSUGI_CPU=avx` forces it). The GPU
+  does nearly all of the work, so the speed is about the same. A CPU without AVX can not run the engine.
 - Linux x86_64 with glibc 2.34 or newer and the libstdc++ of GCC 12 or newer (the engine needs GLIBC_2.34 and
   GLIBCXX_3.4.30). Ubuntu 22.04 and 24.04 have both.
 - `curl` and `nvidia-smi` (it comes with the driver). 32 GB of system RAM or more is best for very long chats.
@@ -26,10 +30,10 @@ https://github.com/professorpalmer/Kintsugi-27B/issues.
 
 ## Download and start
 
-1. Download `Kintsugi-27B-v1.2-linux-x86_64.tar.gz` from the Releases page and unpack it:
+1. Download `Kintsugi-27B-v1.2.1-linux-x86_64.tar.gz` from the Releases page and unpack it:
 
    ```
-   tar -xzf Kintsugi-27B-v1.2-linux-x86_64.tar.gz
+   tar -xzf Kintsugi-27B-v1.2.1-linux-x86_64.tar.gz
    cd Kintsugi-27B
    ```
 
