@@ -1,103 +1,111 @@
 # Kintsugi-27B
 
-Kintsugi-27B is Qwen3.8-27B at 2.47 bits per weight, made to run on one 12 GB NVIDIA card with the full
-262,144-token context. It comes as a model file and a Windows bundle (engine, launcher, saved-chat layer).
+![Kintsugi-27B: every result on one card](benchmarks/kintsugi-27b-master.png)
 
-**The method behind it:** the paper "Kintsugi: Find and Repair Quantization Damage Where Tasks Break, Not Where Averages Look", with the evidence and the scripts to recompute every number: [github.com/professorpalmer/kintsugi-method](https://github.com/professorpalmer/kintsugi-method) (DOI [10.5281/zenodo.24455575](https://doi.org/10.5281/zenodo.24455575)).
+Kintsugi-27B is Qwen3.8-27B at 2.47 bits per weight. It runs on one 12 GB NVIDIA card with the full 262,144-token
+context. You get a model file, a bundle for Windows and Linux (engine, launcher, saved-chat layer) and a Mac kit.
 
-Built on: the **L0xRE-V2 bit allocation** by YourHighnessLA (used unchanged), the **Escha W2 format** by Escha Labs,
-and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: [CREDITS.md](CREDITS.md).
+**Method:** the paper "Kintsugi: Find and Repair Quantization Damage Where Tasks Break, Not Where Averages Look", with
+the evidence and the scripts for every number:
+[github.com/professorpalmer/kintsugi-method](https://github.com/professorpalmer/kintsugi-method) (DOI
+[10.5281/zenodo.24455575](https://doi.org/10.5281/zenodo.24455575)).
 
-**What is special**
+**Built on:** the **L0xRE-V2 bit allocation** by YourHighnessLA (used unchanged), the **Escha W2 format** by Escha
+Labs, and the **EXL3 trellis codec** by turboderp (exllamav3, after QTIP). Full list: [CREDITS.md](CREDITS.md).
 
-- **2.47 bits per weight**: 27 billion weights in a 10.5 GB file (EXL3 trellis code).
-- **The full 262,144-token context on 12 GB**: the tiered K/V cache keeps about the first 144k tokens in
-  VRAM (about 90k with the optional drafter) and the rest in system RAM.
-- **Optional faster decode (v1.1)**: with the DFlash2 drafter file (1.1 GB, Hugging Face), about 25-35 % faster
-  decode at 4k-64k tokens and about 23 % at 117k (RTX 4070, the shipped settings); the same greedy outputs on RTX
-  30 / 40.
-- **Saved chats**: a saved 245k-token chat restores in 2.8 s, so a long chat continues after a restart.
-- **Gated on tasks, not only on KL**: every candidate bit map had to pass long-context recall, long-answer and agent
-  tests. Our maps with lower KL failed them and did not ship ([the study](research/bit-allocation/README.md)).
-- **Works with coding harnesses**: Claude Code, Codex, Pi and OpenCode.
-- **Optional images (v1.1.2)**: with Qwen's vision projector (a separate download), it reads images in chat and in
-  tool results (screenshots); on a 12 GB card the projector runs on the CPU and costs no VRAM
-  ([bundle/README.md](bundle/README.md#images-optional-download)).
-- **Rules hold deep into agent sessions**: after up to 237k tokens of its own agent trace, Kintsugi-27B kept all five
-  standing system-prompt rules with no decay, and was not worse than Qwen3.8-27B BF16 on any rule or depth
-  ([research/persistence-at-depth](research/persistence-at-depth/README.md); the test sees only large gaps).
-- **Multi-turn tool use**: on BFCL v3 multi-turn, Kintsugi-27B passes 505 of 800 entries and Qwen3.8-27B BF16 passes
-  461, higher in all 4 categories (one run per model; the BF16 run used another card and engine build, so a setup
-  effect is not ruled out; [details](benchmarks/bfcl/README.md)).
-- **Runs on RTX 20, 30, 40 and 50 cards and on H100 / H200** with 12 GB or more (RTX 50 and H100 from v1.1.2: one
-  download for all of them; CUDA loads only your card's code, so the others cost no VRAM or speed), and **on Apple
-  Silicon Macs** ([mac/](mac/README.md): chat and an OpenAI-compatible server; tested on an M5 Max). AMD (ROCm / HIP)
-  support is in progress. Intel GPUs are not supported yet. Stock
-  llama.cpp, Ollama and LM Studio cannot load this file.
-- **Fully open**: Apache-2.0 for the model and our files, MIT for the engine. The engine source is in every release.
-  The NVIDIA CUDA DLLs in the zip are NVIDIA's (see [NOTICE](NOTICE)).
-- **Head-to-head on one 12 GB card**: against Inkling 2 Mini, 4x the context, perfect recall at 245k where Inkling
-  cannot load that context, and level on agent tasks (AppWorld 294 vs 283 of 336, not significant; corrected 11-21)
-  ([details](benchmarks/README.md#head-to-head-inkling-2-mini-on-the-same-12-gb-card)).
+## Results
 
-**Measured on two 12 GB cards** (the full 262,144-token window, launcher defaults, MTP + lookup drafting; decode =
-thinking off, 400 tokens, mean of a code, a prose and a bash prompt, a fresh server for each depth):
+| Test | Kintsugi-27B | Note |
+|---|---|---|
+| AppWorld agent tasks (fresh seeds 102 + 103) | **294 / 336** | BF16: 293. Level (p = 1.0). |
+| BFCL v3 multi-turn tool use | **505 / 800** | BF16: 461. Higher in all 4 categories. One run each; setup differs ([details](benchmarks/bfcl/README.md)). |
+| System-prompt rules after up to 237k tokens of its own agent trace | **5 / 5 kept, no decay** | Not worse than BF16. The test sees only large gaps ([study](research/persistence-at-depth/README.md)). |
+| HumanEval (medium thinking) | **161 / 164** | |
+| Recall at 245k tokens | **24 / 24 needles, 20 / 20 code copies** | |
+| Fidelity to BF16 (public golden set) | **top-1 90.8 %, mean KL 0.058** | Perplexity ratio 1.035. |
+| Decode, RTX 4070, at 64k / 117k / 200k / 245k | **67 / 59 / 49 / 31 tok/s** | First read of 245k: 589 tok/s (414 s). About 11.6 GB VRAM, no spill. |
+| Restore a saved 245k-token chat | **2.8 s** | |
+| Claude Code, Codex, Pi, OpenCode | **5 / 6 tasks each** | [Settings](harnesses/README.md). |
+| Images (optional projector) | **19 / 20** | The same as stock llama.cpp. |
 
-| Card | OS | VRAM in use | Decode at 64k / 117k / 200k / 245k | First read of 245k | HumanEval (pass@1) | Recall | Measured by |
-|---|---|---|---|---|---|---|---|
-| RTX 4070 12 GB | Windows 11 | about 11.6 GB, no spill | 67 / 59 / 49 / 31 tok/s | 589 tok/s (414 s) | 161 / 164 | 24 / 24 needles + 20 / 20 code copies at 245k | us ([benchmarks](benchmarks/README.md)) |
-| RTX 3060 12 GB | Debian 13 | 11.6 GB at every depth, no spill | 33.2 / 31.6 / 25.6 / 16.8 tok/s (41.5 short) | 265 tok/s (922 s) | 161, 160, 161 / 164 (three runs) | all correct at 117k, 245k and 258k (his own needle and code-copy set) | Doğukan Ürker ([@DogukanUrker](https://github.com/DogukanUrker), [#15](https://github.com/professorpalmer/Kintsugi-27B/issues/15)) |
+BF16 = full-precision Qwen3.8-27B. Decode: launcher defaults (MTP + lookup), thinking off, 400 tokens, mean of three
+prompts, a fresh server for each depth. Every test and setting: [benchmarks/README.md](benchmarks/README.md).
 
-The RTX 3060 has about half the memory bandwidth of the RTX 4070, so decode is about half as fast; the 16 GB of system
-RAM on that box was enough for the full window with other programs closed.
-
-![Kintsugi-27B](kintsugi-card.png)
-
-![Kintsugi-27B highlights](benchmarks/kintsugi-27b-highlights.png)
-
-![Kintsugi-27B vs Qwen3.8-27B BF16 on BFCL multi-turn tool use](benchmarks/kintsugi-vs-bf16-bfcl.png)
-
-![Rules hold to 237k tokens: no decay, level with full precision](benchmarks/persistence-at-depth.png)
+**RTX 3060 12 GB (Debian 13), measured by Doğukan Ürker** ([@DogukanUrker](https://github.com/DogukanUrker),
+[#15](https://github.com/professorpalmer/Kintsugi-27B/issues/15)): 11.6 GB at every depth, no spill. Decode 33.2 /
+31.6 / 25.6 / 16.8 tok/s (41.5 short). First read of 245k: 265 tok/s (922 s). HumanEval 161, 160 and 161 / 164 in three
+runs. His own needles and code copies: all correct at 117k, 245k and 258k. That card has about half the memory
+bandwidth of the RTX 4070, so decode is about half as fast. 16 GB of system RAM was enough with other programs closed.
 
 ## Quick start (Windows)
 
 1. Download the zip from [Releases (latest)](https://github.com/professorpalmer/Kintsugi-27B/releases/latest) and
    unzip it, for example to `C:\Kintsugi`.
-2. Download `Kintsugi-27B-12G.gguf` from [Hugging Face](https://huggingface.co/CaryPalmer/Kintsugi-27B).
-3. Put the file in the `models` folder of the bundle. Optional: also download `dflash-Qwen3.8-27B-Q4_0.gguf` from the
-   same page into `models` for faster decode (the launcher uses it when it is there).
-4. In PowerShell, in that folder: `powershell -ExecutionPolicy Bypass -File start-server.ps1 -Wait`. Wait for the
-   line `ready  http://127.0.0.1:8080/v1`.
-5. Open http://127.0.0.1:8080/ in a browser, or point an OpenAI-compatible app or a coding harness at
-   `http://127.0.0.1:8080/v1`.
+2. Download `Kintsugi-27B-12G.gguf` from [Hugging Face](https://huggingface.co/CaryPalmer/Kintsugi-27B) into the
+   `models` folder. Optional: add `dflash-Qwen3.8-27B-Q4_0.gguf` from the same page for faster decode.
+3. In PowerShell, in that folder: `powershell -ExecutionPolicy Bypass -File start-server.ps1 -Wait`. Wait for
+   `ready  http://127.0.0.1:8080/v1`.
+4. Open http://127.0.0.1:8080/, or point an OpenAI-compatible app or coding harness at `http://127.0.0.1:8080/v1`.
 
-You need an NVIDIA driver 580 or newer. The full guide is in [bundle/README.md](bundle/README.md).
+You need NVIDIA driver 580 or newer. Full guide: [bundle/README.md](bundle/README.md).
 
-Saved chats go to `slots` (up to 20 GB by default; past that, the files used longest ago are removed). Change the
-limit with `KINTSUGI_SLOT_CACHE_GB`, move the folder with `KINTSUGI_SLOT_SAVE_PATH`, or turn saving off with
-`KINTSUGI_LAYER=0`.
+- **Reasoning effort (v1.2, optional):** `KINTSUGI_EFFORT` = `medium` (default), `xhigh` or `low`; on Windows also
+  `-Effort xhigh` ([details](bundle/README.md#reasoning-effort-optional)).
+- **Saved chats** go to `slots`, up to 20 GB by default (`KINTSUGI_SLOT_CACHE_GB`). Move them with
+  `KINTSUGI_SLOT_SAVE_PATH`. Turn saving off with `KINTSUGI_LAYER=0`.
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.2-linux-x86_64.tar.gz` from the same Releases page, then
-`tar -xzf` it, put the model in `models/`, and run `./start-server.sh --wait`. It needs NVIDIA driver 570 or newer and
-glibc 2.34+ (Ubuntu 22.04 and 24.04); no other libraries. Full guide: [bundle-linux/README.md](bundle-linux/README.md).
+**Linux (x86_64):** download `Kintsugi-27B-v1.2-linux-x86_64.tar.gz` from Releases, unpack it with `tar -xzf`, put the
+model in `models/` and run `./start-server.sh --wait`. Needs NVIDIA driver 570+ and glibc 2.34+ (Ubuntu 22.04 / 24.04),
+no other libraries. Guide: [bundle-linux/README.md](bundle-linux/README.md).
 
-**Mac (Apple Silicon):** `git clone https://github.com/professorpalmer/Kintsugi-27B.git`, then `cd Kintsugi-27B/mac`
-and `./run.sh install` (it downloads the model and converts it), then `./run.sh chat` or `./run.sh serve`. On an M5 Max
-(48 GB): about 76 tok/s output at 4k with MTP, a context of about 259k tokens, 24/24 needles at 259k. Tested on that one Mac
-only; 16 GB Macs and M1 to M4 are untested on real hardware. Full guide: [mac/README.md](mac/README.md).
+**Mac (Apple Silicon):** `git clone https://github.com/professorpalmer/Kintsugi-27B.git`, `cd Kintsugi-27B/mac`,
+`./run.sh install` (downloads and converts the model), then `./run.sh chat` or `./run.sh serve`. On an M5 Max (48 GB):
+about 76 tok/s at 4k with MTP, about 259k tokens of context, 24/24 needles at 259k. Only that Mac is tested; 16 GB Macs
+and M1 to M4 are not. Guide: [mac/README.md](mac/README.md).
 
-## Index
+## Hardware and engine
 
-| Folder | What is in it |
+- **NVIDIA RTX 20 / 30 / 40 / 50 and H100 / H200** with 12 GB or more (RTX 50 and H100 from v1.1.2). One download for
+  all; CUDA loads only your card's code, so the rest costs no VRAM or speed.
+- **Apple Silicon Macs:** see [mac/](mac/README.md). **AMD (ROCm / HIP):** in progress. **Intel GPUs:** not yet.
+- The file needs our engine (a llama.cpp fork, in every bundle). Stock llama.cpp, Ollama and LM Studio cannot load it.
+
+<details>
+<summary><b>How it works</b></summary>
+
+- **2.47 bits per weight:** 27 billion weights in a 10.5 GB file (EXL3 trellis code).
+- **262,144 tokens on 12 GB:** the tiered K/V cache keeps about the first 144k tokens in VRAM (about 90k with the
+  drafter) and the rest in system RAM.
+- **DFlash2 drafter (optional, v1.1, 1.1 GB):** about 25-35 % faster decode at 4k-64k tokens and about 23 % at 117k
+  (RTX 4070, shipped settings). The greedy outputs stay the same on RTX 30 / 40.
+- **Gated on tasks, not only on KL:** every candidate bit map had to pass long-context recall, long-answer and agent
+  tests. Our maps with lower KL failed them and did not ship ([study](research/bit-allocation/README.md)).
+- **Images (optional, v1.1.2):** Qwen's vision projector (a separate download) reads images in chat and in tool results.
+  On a 12 GB card it runs on the CPU and costs no VRAM ([guide](bundle/README.md#images-optional-download)).
+
+</details>
+
+<details>
+<summary><b>Folders</b></summary>
+
+| Folder | Contents |
 |---|---|
-| [bundle/](bundle/README.md) | The user guide, the text files of the Windows zip (launcher, layer, chat template) and the changelog. |
-| [bundle-linux/](bundle-linux/README.md) | The Linux guide and launcher scripts of the Linux tarball (the layer and template are the same as in bundle/). |
-| [mac/](mac/README.md) | The Apple Silicon kit: install, chat and an OpenAI-compatible server on a Mac (MLX), with its own checks. |
-| [harnesses/](harnesses/README.md) | Settings for Claude Code, Codex, Pi and OpenCode, and what we tested. |
-| [model/](model/README.md) | The model file: format, bits, which tensors keep full precision, and what can load it. |
-| [engine/](engine/README.md) | The engine (a llama.cpp fork): where the source is, how to build it, the driver needs. |
-| [benchmarks/](benchmarks/README.md) | Each number on the card: the test, the settings, the card and the date. |
+| [bundle/](bundle/README.md) | User guide, Windows launcher, layer, chat template, changelog. |
+| [bundle-linux/](bundle-linux/README.md) | Linux guide and launcher (layer and template as in bundle/). |
+| [mac/](mac/README.md) | Apple Silicon kit (MLX): install, chat, server, checks. |
+| [harnesses/](harnesses/README.md) | Settings for Claude Code, Codex, Pi and OpenCode; what we tested. |
+| [model/](model/README.md) | The model file: format, bits, full-precision tensors, what can load it. |
+| [engine/](engine/README.md) | The engine (a llama.cpp fork): source, build, driver needs. |
+| [benchmarks/](benchmarks/README.md) | Every number: test, settings, card, date. Also the earlier cards. |
 | [research/](research/README.md) | Finished studies: bit allocation, harness gate, old drivers, long-context decode, cross-architecture, clean rebuild. |
 
-Licences: [LICENSE](LICENSE) (Apache-2.0) and [NOTICE](NOTICE). Credits: [CREDITS.md](CREDITS.md). Problems,
-numbers from your card and fixes: please open an issue or a pull request.
+</details>
+
+## Licence and credits
+
+Apache-2.0 for the model and our files ([LICENSE](LICENSE)), MIT for the engine. The engine source is in every
+release. The NVIDIA CUDA DLLs in the zip are NVIDIA's ([NOTICE](NOTICE)).
+
+Thanks to the Qwen team, turboderp (exllamav3), the QTIP authors, Escha Labs, YourHighnessLA (L0xRE), StillDeadcode
+(quant challenge), Ajay9o9, Aldehir Rojas (llama.cpp #32381), Inco AI (DFlash2), the llama.cpp / ggml contributors and
+many more: [CREDITS.md](CREDITS.md). Issues and pull requests are welcome.

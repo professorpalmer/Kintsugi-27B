@@ -27,6 +27,14 @@ cells in VRAM, two-stage head, MTP draft 3 + lookup drafting, int8 fast read, mi
 | Voxel pagoda (Killy's test): 3 / 6 first try, 6 / 6 after repair | One HTML page with a five-tier voxel pagoda in three.js, checked in a headless browser; up to 3 repair turns with the probe's facts (see [pagoda/](pagoda/README.md), with all final pages and screenshots) | v1.1 Windows bundle, launcher defaults, effort medium; 6 samples | RTX 4070 (rig) | 2026-11-21 | **Clean on the first try 3 / 6, after one repair 5 / 6, after three 6 / 6**; 0 console errors; by eye 4 of 6 are clear five-tier pagodas |
 | Standing rules at depth: no decay to 237k | 5 house rules in the system prompt (2 shown in the trace, 3 only in the system prompt); 24 tasks that tempt a rule, after 0 to 237,229 tokens of the model's own coding-agent trace; the first response scored by script; 2 seeds, 240 responses per arm; Fisher lines written before the run (see [persistence-at-depth](../research/persistence-at-depth/README.md)) | **Kintsugi:** v1.1 Windows bundle, launcher defaults, layer off, effort medium. **BF16:** Qwen3.8-27B BF16 in our engine (`af70fc544`), f16 K/V, no drafting; the same sampling defaults and template | RTX 4070 (rig) for Kintsugi; rented A100 SXM4 80 GB for BF16 | 2026-11-22 | **Kintsugi vs BF16:** R1 81/81 vs 81/81, R3 120/120 vs 120/120, R2 56/60 vs 59/60, R4 44/44 vs 47/47, R5 59/60 vs 59/60. No decay with depth in either arm; Kintsugi not worse on any rule or depth (smallest p = 0.48). Read by hand: 2 real R2 breaks for Kintsugi (at 32k and 200k), 0 for BF16; the other fails are scorer-strict. |
 
+## Cards
+
+The front page shows one card: [kintsugi-27b-master.png](kintsugi-27b-master.png). It carries every number of the four
+earlier cards. The earlier cards stay here, so old links still work: [stat card](../kintsugi-card.png),
+[v1.1.2 highlights](kintsugi-27b-highlights.png), [BFCL multi-turn](kintsugi-vs-bf16-bfcl.png),
+[rules at depth](persistence-at-depth.png). The master card is made by code from the public data, with a check against
+the numbers on this page.
+
 ## Checks on each GPU architecture
 
 These checks show that the kernels compute the same model on each architecture. Speeds from rented boxes are not
