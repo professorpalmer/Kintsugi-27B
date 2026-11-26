@@ -5,8 +5,10 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
-## Unreleased
+## v1.2 (2026-11-25)
 
+- The same model file (sha256 `0510bae8...`) and the same engine (`7d9bb6296`) as v1.1.7: download only the new
+  bundle if you want the change below.
 - **Reasoning effort, opt-in (`KINTSUGI_EFFORT`).** The launchers forced the effort `medium` for every request. A
   new setting sets the default effort: `medium` (the default, unchanged), `xhigh` or `low`. On Windows also
   `start-server.ps1 -Effort xhigh`. A request can now set its own effort (`"reasoning_effort"`): the server accepts
@@ -17,6 +19,9 @@ the same for every version below: when a new bundle comes out, download only the
 - With the default settings the only changed server flag is `--reasoning-effort-allow` (now `xhigh,medium,low`;
   `--reasoning-effort-fallback` is the default effort). A request with no effort or with `medium` gets the same
   prompt as before.
+- Checked on Windows and Linux: with the default settings the server flags and the prompts are the same as v1.1.7
+  (byte for byte) apart from `--reasoning-effort-allow`; with `KINTSUGI_EFFORT=xhigh` each effort word gives the expected
+  prompt, chat and tool-call requests answer, and the saved-chat layer keeps the saves of each effort apart.
 
 ## v1.1.7 (2026-11-24)
 

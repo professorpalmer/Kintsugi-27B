@@ -22,7 +22,7 @@ The source of each release build is a release asset. Licence: MIT, the same as l
 
 | Engine | Bundles | Source asset | sha256 |
 |---|---|---|---|
-| `7d9bb6296` | v1.1.7 (Windows and Linux) | `Kintsugi-27B-v1.1.7-engine-src-7d9bb6296.tar.gz` (43,086,685 bytes) | `7e0e727c66095394a38600d32f6dc737e93c0ec98272bb5c649be763e5602039` |
+| `7d9bb6296` | v1.1.7 and v1.2 (Windows and Linux) | `Kintsugi-27B-v1.1.7-engine-src-7d9bb6296.tar.gz` (43,086,685 bytes) | `7e0e727c66095394a38600d32f6dc737e93c0ec98272bb5c649be763e5602039` |
 | `8f12baacf` | v1.1.6 (Windows and Linux) | `Kintsugi-27B-v1.1.6-engine-src-8f12baacf.tar.gz` (43,075,805 bytes) | `c1c7812e1193f5604ee243cead1b269d49d160d72e1accb2b5564bc0d4081d1d` |
 | `d512c2d77` | v1.1.5 (Windows and Linux) | `Kintsugi-27B-v1.1.5-engine-src-d512c2d77.tar.gz` (43,085,588 bytes) | `488b500da95dbffb0a9845d2661027fcb374c153a6675debb8765a78942c63fa` |
 | `b9c5b427d` | v1.1.2 to v1.1.4 (Windows and Linux) | `Kintsugi-27B-v1.1.2-engine-src-b9c5b427d.tar.gz` (43,067,633 bytes) | `ebc9780d37977b077b190b172a6123e60d25cd6b439222e03a910c3d280427b0` |
