@@ -87,6 +87,10 @@ measurements.
   amd-test-win1: KL -0.15 % against our CUDA engine, all checks PASS).
 - **Mustafa YILDIRIM ([@mustafayildirim](https://github.com/mustafayildirim))**: the first RDNA4 test (Radeon AI PRO
   R9700, Linux). His amd-test-3 run found the missing hipBLASLt library on gfx1201; amd-test-4 passed every check.
+- **loadnl**: two full Windows RDNA3 runs on an RX 7900 XT (#7 and #20). The amd-test-5b run (#20) passed every
+  check, with KL -0.11 % against our CUDA engine.
+- **luluijn**: the first test on a PC with an AMD integrated GPU next to the card (RX 7800 XT, Windows 10, #23),
+  which shows how the builds choose the device.
 - **turboderp (exllamav3)**: the ROCm port of the EXL3 kernels: the emulated tensor-core fragments (`ptx_rocm.cuh`)
   and the native RDNA GEMV kernels (the one-row kernel, the multi-row core, and in amd-test-5 the "tiles" core,
   the multi-row design and the fused rotation epilogue), MIT.
@@ -113,6 +117,9 @@ measurements.
 - **hyf03288**: the Ivy Bridge report (#21) with the exact diagnosis (the `shlx` fault in `ggml-cpu.dll` before the
   first log line), the test of the AVX + F16C library on a real Xeon E3-1230 V2, and the saved-chat layer fix in
   v1.2.1 (the layer now passes the web page's `x-conv*` headers, so a stream can be resumed).
+- **XeonG**: the `slots` folder report (#12) that led to the v1.1.6 fix (saved chat states that a chat could never
+  use again).
+- **Killy**: the voxel-pagoda prompt behind our bad-token check.
 
 ## Citations
 
