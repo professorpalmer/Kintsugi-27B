@@ -70,7 +70,9 @@ and M1 to M4 are not. Guide: [mac/README.md](mac/README.md).
   all; CUDA loads only your card's code, so the rest costs no VRAM or speed.
 - **CPU:** AVX2 (Intel Haswell 2013 / AMD Zen or newer), or AVX + F16C (for example Intel Ivy Bridge 2012) with the
   second CPU library that the launchers pick by themselves (v1.2.1, #21). The GPU does nearly all of the work.
-- **Apple Silicon Macs:** see [mac/](mac/README.md). **AMD (ROCm / HIP):** in progress. **Intel GPUs:** not yet.
+- **Apple Silicon Macs:** see [mac/](mac/README.md). **AMD (ROCm / HIP):** release candidate
+  [amd-rc1](https://github.com/professorpalmer/Kintsugi-27B/releases/tag/amd-rc1) (Windows and Linux, RDNA3 and RDNA4);
+  test reports are welcome. **Intel GPUs:** not yet.
 - The file needs our engine (a llama.cpp fork, in every bundle). Stock llama.cpp, Ollama and LM Studio cannot load it.
 
 <details>
@@ -112,3 +114,7 @@ release. The NVIDIA CUDA DLLs in the zip are NVIDIA's ([NOTICE](NOTICE)).
 Thanks to the Qwen team, turboderp (exllamav3), the QTIP authors, Escha Labs, YourHighnessLA (L0xRE), StillDeadcode
 (quant challenge), Ajay9o9, Aldehir Rojas (llama.cpp #32381), Inco AI (DFlash2), the llama.cpp / ggml contributors and
 many more: [CREDITS.md](CREDITS.md). Issues and pull requests are welcome.
+
+Tested and reported by: Lazm, Abdelrahman Waref, Mustafa YILDIRIM, loadnl and luluijn (AMD builds); Amel,
+Doğukan Ürker, xgxx666, hyf03288, XeonG and Killy (reports, tests and fixes). Thank you. What each person did is in
+[CREDITS.md](CREDITS.md). If we missed you, tell us.
