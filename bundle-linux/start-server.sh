@@ -232,10 +232,24 @@ if [ "$VISION" != off ] && [ "$MODE" = dflash ]; then
   MODE=mtp; DRAFTER_MIB=0
   DRAFT_NOTE="note   vision on: MTP + lookup drafting (the DFlash2 drafter does not work with images yet; KINTSUGI_VISION=off uses it)"
 fi
+# ---- More than one slot (-np N or --parallel N in KINTSUGI_EXTRA): no drafting ----------------------------------------
+# With several slots, a rejected draft could be rolled back from the state of another slot, and the answer broke off
+# into unrelated text (found by the NetSphere lab, 2026-11-27; engines up to v1.2.1). One slot (the default) was never
+# affected. The engine of this release turns drafting off with more than one slot; the launcher does the same before
+# the start, so that the VRAM plan is right. Each slot more takes about 150 MiB of VRAM for its recurrent state.
+SLOTS=1
+read -r -a SLOT_ARGS <<< "$(pick EXTRA '')"
+for ((i = 0; i + 1 < ${#SLOT_ARGS[@]}; i++)); do
+  case "${SLOT_ARGS[i]}" in -np|--parallel) case "${SLOT_ARGS[i+1]}" in ''|*[!0-9]*) ;; *) SLOTS="${SLOT_ARGS[i+1]}" ;; esac ;; esac
+done
+if [ "$SLOTS" -gt 1 ] && [ "$MODE" != off ]; then
+  MODE=off; DRAFTER_MIB=0
+  DRAFT_NOTE="note   $SLOTS slots (-np $SLOTS): drafting is off. Drafting (DFlash2, MTP, lookup) needs one slot, the default: with more slots it could break answers."
+fi
 IMG_MAX="$(pick IMAGE_MAX_TOKENS 2048)"
 # Measured for the 629,247,008-byte Q8_0 projector at a 2048-token cap; another file moves it by the difference.
 VISION_MIB=0; [ "$VISION" = gpu ] && VISION_MIB=$(( 852 + ($(stat -L -c %s "$MMPROJ") - 629247008) / 1048576 ))
-FIXED=$((9473 + HEAD_MIB - HEAD2_MIB + DRAFTER_MIB + VISION_MIB))
+FIXED=$((9473 + HEAD_MIB - HEAD2_MIB + DRAFTER_MIB + VISION_MIB + 150 * (SLOTS - 1)))
 # The first request adds about 222 MiB once (cuBLAS, kernel code at first use); the warm-up request pays it at start.
 # Requests of many new lengths then add up to about 210 MiB (CUDA graphs); the margin covers that. With DFlash2, 128 MiB
 # more: Linux needs about 50 MiB more for it than Windows, and the rest keeps the peak 64 MiB or more under the limit.

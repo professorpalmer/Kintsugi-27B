@@ -55,7 +55,7 @@ picks the matching CPU library by itself, v1.2.1). Full guide: [bundle/README.md
 - **Saved chats** go to `slots`, up to 20 GB by default (`KINTSUGI_SLOT_CACHE_GB`). Move them with
   `KINTSUGI_SLOT_SAVE_PATH`. Turn saving off with `KINTSUGI_LAYER=0`.
 
-**Linux (x86_64):** download `Kintsugi-27B-v1.2.1-linux-x86_64.tar.gz` from Releases, unpack it with `tar -xzf`, put the
+**Linux (x86_64):** download `Kintsugi-27B-v1.2.2-linux-x86_64.tar.gz` from Releases, unpack it with `tar -xzf`, put the
 model in `models/` and run `./start-server.sh --wait`. Needs NVIDIA driver 570+ and glibc 2.34+ (Ubuntu 22.04 / 24.04),
 no other libraries. Guide: [bundle-linux/README.md](bundle-linux/README.md).
 

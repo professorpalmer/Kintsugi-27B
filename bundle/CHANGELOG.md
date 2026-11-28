@@ -5,6 +5,30 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.2.2 (2026-11-27)
+
+- The same model file (sha256 `0510bae8...`) as v1.2.1. New engine source `34b994870` (v1.2.1's `7d9bb6296` + the
+  guard below + one test). Thanks to Killy (NetSphere lab), whose independent test found this (#25).
+- **Who is affected:** only a server with more than one request at a time (`-np 2` or more, for example in
+  `KINTSUGI_EXTRA`) AND a drafter on (DFlash2, or MTP + lookup). The launchers start one slot (`-np 1`) by default,
+  so the default setup was never affected. In the lab's test, with the DFlash2 drafter and 10 requests per server,
+  17 of 1,164 answers broke off: a thought turned into unrelated text, often with no answer. With one request per
+  server, or with the drafter off, 0 of 1,164.
+- **The cause:** the model keeps a recurrent state for each slot, and while it drafts, the engine keeps a copy of
+  that state for each draft token, so that it can roll back the tokens that the check rejects. When the slots of one
+  step are not in order, the engine moves the state of a slot to another place. It moved only the live state, not
+  the saved copies. A later rollback of that slot then read the old state of a different slot, and the answer went on
+  from the wrong state. With one slot, or with two, no slot is moved in this way.
+- **What v1.2.2 does:** with more than one slot on this model, the engine does not draft (no drafter is loaded and no
+  state copies are kept) and writes one log line: `drafting is OFF: the server has N slots ...`. The launchers do the
+  same before the start and print one line: `note   N slots (-np N): drafting is off ...`; the VRAM plan then counts
+  about 150 MiB for each slot more. With one slot, nothing changes: the same flags, the same speed, the same outputs
+  (50 of 50 reference prompts token-identical to v1.2.1).
+- **Not fixed yet:** drafting with more than one slot. The real fix (the saved copies move with their slot) follows
+  in a later release; until then, several slots work without drafting.
+- **Our own published results:** we checked every run family behind our published numbers. None of them used more
+  than one slot with a drafter on, so no published number changes.
+
 ## v1.2.1 (2026-11-26)
 
 - The same model file (sha256 `0510bae8...`) and the same engine source (`7d9bb6296`) as v1.2. From the report, the

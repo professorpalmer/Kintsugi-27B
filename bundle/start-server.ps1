@@ -394,10 +394,24 @@ function Test-MtpRetry($why) {
         $Mode = 'mtp'; $DrafterMiB = 0
         $DraftNote = "note   vision on: MTP + lookup drafting (the DFlash2 drafter does not work with images yet; KINTSUGI_VISION=off uses it)"
     }
+    # ---- More than one slot (-np N or --parallel N in KINTSUGI_EXTRA): no drafting ------------------------------------
+    # With several slots, a rejected draft could be rolled back from the state of another slot, and the answer broke off
+    # into unrelated text (found by the NetSphere lab, 2026-11-27; engines up to v1.2.1). One slot (the default) was
+    # never affected. The engine of this release turns drafting off with more than one slot; the launcher does the same
+    # before the start, so that the VRAM plan is right. Each slot more takes about 150 MiB of VRAM for its recurrent state.
+    $Slots = 1
+    $SlotArgs = @((Pick 'EXTRA' '').Split(' ') | Where-Object { $_ })
+    for ($i = 0; $i + 1 -lt $SlotArgs.Count; $i++) {
+        if ($SlotArgs[$i] -in @('-np', '--parallel') -and $SlotArgs[$i + 1] -match '^\d+$') { $Slots = [int]$SlotArgs[$i + 1] }
+    }
+    if ($Slots -gt 1 -and $Mode -ne 'off') {
+        $Mode = 'off'; $DrafterMiB = 0
+        $DraftNote = "note   $Slots slots (-np $Slots): drafting is off. Drafting (DFlash2, MTP, lookup) needs one slot, the default: with more slots it could break answers."
+    }
     $ImgMax = [int](Pick 'IMAGE_MAX_TOKENS' 2048)
     # Measured for the 629,247,008-byte Q8_0 projector at a 2048-token cap; another file moves it by the difference.
     $VisionMiB = if ($Vision -eq 'gpu') { 852 + [int][math]::Round(((FileLength $Mmproj) - 629247008) / 1MB) } elseif ($Vision -eq 'cpu') { 0 } else { 0 }
-    $Fixed = 9473 + $HeadMiB - $Head2MiB + $DrafterMiB + $VisionMiB
+    $Fixed = 9473 + $HeadMiB - $Head2MiB + $DrafterMiB + $VisionMiB + 150 * ($Slots - 1)
     # The first request adds about 222 MiB once (cuBLAS, kernel code at first use); the warm-up request pays it at start.
     # Requests of many new lengths then add up to about 210 MiB (CUDA graphs); the margin covers that. With DFlash2, 128 MiB
     # more: Linux needs about 50 MiB more for it than Windows, and the rest keeps the peak 64 MiB or more under the limit.

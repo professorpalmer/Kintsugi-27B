@@ -119,7 +119,9 @@ measurements.
   v1.2.1 (the layer now passes the web page's `x-conv*` headers, so a stream can be resumed).
 - **XeonG**: the `slots` folder report (#12) that led to the v1.1.6 fix (saved chat states that a chat could never
   use again).
-- **Killy**: the voxel-pagoda prompt behind our bad-token check.
+- **Killy (NetSphere lab)**: the voxel-pagoda prompt behind our bad-token check, and the independent test
+  (2026-11-27) that found broken answers with the DFlash2 drafter and more than one request on one server (17 of
+  1,164 answers at 10 requests per server, 0 with one request or with the drafter off). It led to the v1.2.2 fix (#25).
 
 ## Citations
 
