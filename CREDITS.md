@@ -82,7 +82,10 @@ measurements.
 
 ## AMD (ROCm / HIP) builds
 
-- **Lazm**: the first Linux RDNA3 test (RX 7900 XTX). He found the RDNA GEMV trap and its source line.
+- **Lazm**: the first Linux RDNA3 test (RX 7900 XTX). He found the RDNA GEMV trap and its source line. On amd-rc1
+  he found why a long read stopped on native Linux (#11): the 20th context checkpoint, with a stack of the copy that
+  never finished, the same stop on a stock llama.cpp build, and the workaround. This led to the checkpoints-off
+  default of amd-rc2.
 - **Abdelrahman Waref ([awaref.me](https://awaref.me/))**: the first Windows RDNA3 test (RX 7900 XTX,
   amd-test-win1: KL -0.15 % against our CUDA engine, all checks PASS).
 - **Mustafa YILDIRIM ([@mustafayildirim](https://github.com/mustafayildirim))**: the first RDNA4 test (Radeon AI PRO
@@ -90,7 +93,8 @@ measurements.
 - **loadnl**: two full Windows RDNA3 runs on an RX 7900 XT (#7 and #20). The amd-test-5b run (#20) passed every
   check, with KL -0.11 % against our CUDA engine.
 - **luluijn**: the first test on a PC with an AMD integrated GPU next to the card (RX 7800 XT, Windows 10, #23),
-  which shows how the builds choose the device.
+  which shows how the builds choose the device. The test with `HIP_VISIBLE_DEVICES=1` led to the automatic choice
+  of the discrete GPU in amd-rc2.
 - **turboderp (exllamav3)**: the ROCm port of the EXL3 kernels: the emulated tensor-core fragments (`ptx_rocm.cuh`)
   and the native RDNA GEMV kernels (the one-row kernel, the multi-row core, and in amd-test-5 the "tiles" core,
   the multi-row design and the fused rotation epilogue), MIT.
