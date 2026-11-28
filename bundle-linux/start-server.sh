@@ -232,10 +232,31 @@ if [ "$VISION" != off ] && [ "$MODE" = dflash ]; then
   MODE=mtp; DRAFTER_MIB=0
   DRAFT_NOTE="note   vision on: MTP + lookup drafting (the DFlash2 drafter does not work with images yet; KINTSUGI_VISION=off uses it)"
 fi
+# ---- More than one slot (-np N or --parallel N in KINTSUGI_EXTRA): the VRAM of the recurrent state -------------------
+# One slot (the default) keeps one copy of the recurrent state (about 150 MiB) and the fast rollback. With N slots and
+# drafting, the engine keeps 1 + D copies for each slot (D = the draft size: 7 for DFlash2, 3 for MTP), so that it can
+# roll back rejected draft tokens: about 150 MiB x (1 + D) x N. (Up to v1.2.1 a rollback with 3 or more slots could
+# read the copies of another slot, and an answer broke off into unrelated text: found by the NetSphere lab, 2026-11-27.
+# v1.2.2 fixes it; LLAMA_RS_MULTI_SEQ_GUARD=1 turns drafting off with more than one slot, as a safety net.)
+SLOTS=1
+read -r -a SLOT_ARGS <<< "$(pick EXTRA '')"
+for ((i = 0; i + 1 < ${#SLOT_ARGS[@]}; i++)); do
+  case "${SLOT_ARGS[i]}" in -np|--parallel) case "${SLOT_ARGS[i+1]}" in ''|*[!0-9]*) ;; *) SLOTS="${SLOT_ARGS[i+1]}" ;; esac ;; esac
+done
+RS_MIB=0
+if [ "$SLOTS" -gt 1 ]; then
+  if [ -n "${LLAMA_RS_MULTI_SEQ_GUARD:-}" ] && [ "${LLAMA_RS_MULTI_SEQ_GUARD}" != 0 ] && [ "$MODE" != off ]; then
+    MODE=off; DRAFTER_MIB=0
+    DRAFT_NOTE="note   $SLOTS slots (-np $SLOTS) and LLAMA_RS_MULTI_SEQ_GUARD: drafting is off."
+  fi
+  RS_D=0; [ "$MODE" = dflash ] && RS_D=7; [ "$MODE" = mtp ] && RS_D=$MTP_DRAFT
+  RS_MIB=$(( 150 * (1 + RS_D) * SLOTS - 150 ))
+  RS_NOTE="note   $SLOTS slots (-np $SLOTS): the recurrent state takes about $(( 150 * (1 + RS_D) * SLOTS )) MiB of VRAM ($(( 1 + RS_D )) x 150 MiB for each slot)."
+fi
 IMG_MAX="$(pick IMAGE_MAX_TOKENS 2048)"
 # Measured for the 629,247,008-byte Q8_0 projector at a 2048-token cap; another file moves it by the difference.
 VISION_MIB=0; [ "$VISION" = gpu ] && VISION_MIB=$(( 852 + ($(stat -L -c %s "$MMPROJ") - 629247008) / 1048576 ))
-FIXED=$((9473 + HEAD_MIB - HEAD2_MIB + DRAFTER_MIB + VISION_MIB))
+FIXED=$((9473 + HEAD_MIB - HEAD2_MIB + DRAFTER_MIB + VISION_MIB + RS_MIB))
 # The first request adds about 222 MiB once (cuBLAS, kernel code at first use); the warm-up request pays it at start.
 # Requests of many new lengths then add up to about 210 MiB (CUDA graphs); the margin covers that. With DFlash2, 128 MiB
 # more: Linux needs about 50 MiB more for it than Windows, and the rest keeps the peak 64 MiB or more under the limit.
@@ -375,12 +396,16 @@ ALIAS="$(pick ALIAS kintsugi)"
 echo "Kintsugi-27B"
 echo "model  $(basename "$MODEL")"
 echo "listen $LISTEN:$PORT$([ $USE_LAYER = 1 ] && echo " (layer; llama-server on 127.0.0.1:$SERVER_PORT)")$([ -n "$KEY_FILE" ] && echo ", API key on")"
+if [ "$SLOTS" -gt 1 ] && [ $((FIXED + GROWTH + MARGIN + 600)) -gt "$CEILING" ]; then
+  echo "WARN   $SLOTS slots with this drafting need about $FIXED MiB of VRAM before any K/V cell; the limit on this card is $CEILING MiB. The load can fail with \"out of memory\". Use fewer slots, or KINTSUGI_DRAFT=mtp (fewer state copies) or KINTSUGI_DRAFT=off."
+fi
 echo "kv     $KV, tiered: cells 0..$CELLS in VRAM, $CELLS..$CTX in system RAM (free $((TOTAL - USED)) MiB, reserved $RESERVED, ceiling $CEILING, fixed $FIXED, growth $GROWTH, margin $MARGIN ($MARGIN_WHY))"
 echo "template $([ "$TEMPLATE" = model ] && echo "the model file's own" || echo "$TEMPLATE")"
 [ "$HEAD2" -gt 0 ] && echo "head   two-stage: first stage q4_0 in VRAM, $HEAD2 exact candidates for each row from system RAM"
 case "$MODE" in off) SPEC_TXT=off ;; dflash) SPEC_TXT="DFlash2 draft 7 ($(basename "$DRAFTER"))" ;; *) SPEC_TXT="MTP draft $DRAFT + lookup" ;; esac
 echo "spec   $SPEC_TXT; thinking $THINK; effort $EFFORT; read $GGML_ESCHA_PREFILL"
 [ -n "$DRAFT_NOTE" ] && echo "$DRAFT_NOTE"
+[ -n "${RS_NOTE:-}" ] && echo "$RS_NOTE"
 if [ "$VISION" = off ]; then echo "vision off"; else echo "vision $VISION ($(basename "$MMPROJ")), up to $IMG_MAX tokens per image"; fi
 if [ $DRY = 1 ]; then echo "args   ${ARGS[*]}"; exit 0; fi
 

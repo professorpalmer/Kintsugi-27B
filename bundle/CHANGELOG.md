@@ -5,6 +5,36 @@ the same for every version below: when a new bundle comes out, download only the
 [Releases page](https://github.com/professorpalmer/Kintsugi-27B/releases) also has the engine source
 (`Kintsugi-27B-v1-engine-src-c07efbec5.tar.gz`, sha256 `0e8f2a1c3c293ce83ca9892e2ba61a3b3beaaa8870ecc907f2a047092d6391b7`).
 
+## v1.2.2 (2026-11-27)
+
+- The same model file (sha256 `0510bae8...`) as v1.2.1. New engine source `726bcfb15` (v1.2.1's `7d9bb6296` + the
+  fix below + one test). Thanks to Killy (NetSphere lab), whose independent test found this (#25).
+- **Who was affected:** only a server with 3 or more requests at a time (`-np 3` or more, for example in
+  `KINTSUGI_EXTRA`) AND a drafter on (DFlash2, or MTP + lookup). The launchers start one slot (`-np 1`) by default,
+  so the default setup was never affected. In the lab's test, with the DFlash2 drafter and 10 requests per server,
+  17 of 1,164 answers broke off: a thought turned into unrelated text, often with no answer. With one request per
+  server, or with the drafter off, 0 of 1,164.
+- **The cause:** the model keeps a recurrent state for each slot, and while it drafts, the engine keeps a copy of
+  that state for each draft token, so that it can roll back the tokens that the check rejects. When the slots of one
+  step are not in order, the engine moves the state of a slot to another place. It moved only the live state, not
+  the saved copies. A later rollback of that slot then read the old state of a different slot, and the answer went on
+  from the wrong state. With one slot, or with two, no slot is moved in this way. (The same code is in upstream
+  llama.cpp; we will report it there.)
+- **The fix:** the saved copies now move with the live state of their slot. Drafting with several slots works again; in the
+  tests below no answer broke. A test in the engine source (`tests/test-recurrent-cell-move`) shows the
+  old fault and checks the fix.
+- **VRAM with several slots and drafting:** each slot keeps 1 + D copies of its recurrent state (about 150 MiB each;
+  D = the draft size: 7 for DFlash2, 3 for MTP). So N slots take about 150 MiB x (1 + D) x N: 1,200 MiB per slot with
+  DFlash2, 600 MiB per slot with MTP. The launchers count this in their VRAM plan, print one `note` line with the
+  total, and a `WARN` line when the slots do not fit the card (on a 12 GB card, 2 slots with DFlash2 do not fit; use
+  `KINTSUGI_DRAFT=mtp` or fewer slots). One slot is unchanged (about 177 MiB, fast rollback).
+- **Safety net:** `LLAMA_RS_MULTI_SEQ_GUARD=1` turns drafting off with more than one slot (engine and launchers),
+  with one log line.
+- **One slot: nothing changes.** The same flags, the same outputs (50 of 50 reference prompts token-identical to
+  v1.2.1) and the same speed.
+- **Our own published results:** we checked every run family behind our published numbers. None of them used more
+  than one slot with a drafter on, so no published number changes.
+
 ## v1.2.1 (2026-11-26)
 
 - The same model file (sha256 `0510bae8...`) and the same engine source (`7d9bb6296`) as v1.2. From the report, the

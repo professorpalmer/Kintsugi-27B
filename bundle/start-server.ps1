@@ -394,10 +394,31 @@ function Test-MtpRetry($why) {
         $Mode = 'mtp'; $DrafterMiB = 0
         $DraftNote = "note   vision on: MTP + lookup drafting (the DFlash2 drafter does not work with images yet; KINTSUGI_VISION=off uses it)"
     }
+    # ---- More than one slot (-np N or --parallel N in KINTSUGI_EXTRA): the VRAM of the recurrent state ---------------
+    # One slot (the default) keeps one copy of the recurrent state (about 150 MiB) and the fast rollback. With N slots
+    # and drafting, the engine keeps 1 + D copies for each slot (D = the draft size: 7 for DFlash2, 3 for MTP), so that
+    # it can roll back rejected draft tokens: about 150 MiB x (1 + D) x N. (Up to v1.2.1 a rollback with 3 or more slots
+    # could read the copies of another slot, and an answer broke off into unrelated text: found by the NetSphere lab,
+    # 2026-11-27. v1.2.2 fixes it; LLAMA_RS_MULTI_SEQ_GUARD=1 turns drafting off with more than one slot, as a safety net.)
+    $Slots = 1
+    $SlotArgs = @((Pick 'EXTRA' '').Split(' ') | Where-Object { $_ })
+    for ($i = 0; $i + 1 -lt $SlotArgs.Count; $i++) {
+        if ($SlotArgs[$i] -in @('-np', '--parallel') -and $SlotArgs[$i + 1] -match '^\d+$') { $Slots = [int]$SlotArgs[$i + 1] }
+    }
+    $RsMiB = 0; $RsNote = ''
+    if ($Slots -gt 1) {
+        if ($env:LLAMA_RS_MULTI_SEQ_GUARD -and $env:LLAMA_RS_MULTI_SEQ_GUARD -ne '0' -and $Mode -ne 'off') {
+            $Mode = 'off'; $DrafterMiB = 0
+            $DraftNote = "note   $Slots slots (-np $Slots) and LLAMA_RS_MULTI_SEQ_GUARD: drafting is off."
+        }
+        $RsD = if ($Mode -eq 'dflash') { 7 } elseif ($Mode -eq 'mtp') { $MtpDraft } else { 0 }
+        $RsMiB = 150 * (1 + $RsD) * $Slots - 150
+        $RsNote = "note   $Slots slots (-np $Slots): the recurrent state takes about $(150 * (1 + $RsD) * $Slots) MiB of VRAM ($(1 + $RsD) x 150 MiB for each slot)."
+    }
     $ImgMax = [int](Pick 'IMAGE_MAX_TOKENS' 2048)
     # Measured for the 629,247,008-byte Q8_0 projector at a 2048-token cap; another file moves it by the difference.
     $VisionMiB = if ($Vision -eq 'gpu') { 852 + [int][math]::Round(((FileLength $Mmproj) - 629247008) / 1MB) } elseif ($Vision -eq 'cpu') { 0 } else { 0 }
-    $Fixed = 9473 + $HeadMiB - $Head2MiB + $DrafterMiB + $VisionMiB
+    $Fixed = 9473 + $HeadMiB - $Head2MiB + $DrafterMiB + $VisionMiB + $RsMiB
     # The first request adds about 222 MiB once (cuBLAS, kernel code at first use); the warm-up request pays it at start.
     # Requests of many new lengths then add up to about 210 MiB (CUDA graphs); the margin covers that. With DFlash2, 128 MiB
     # more: Linux needs about 50 MiB more for it than Windows, and the rest keeps the peak 64 MiB or more under the limit.
@@ -588,11 +609,15 @@ function Test-MtpRetry($why) {
     Write-Host "Kintsugi-27B"
     Write-Host "model  $(Split-Path $Model -Leaf)"
     Write-Host "listen $ListenHost`:$Port$(if ($UseLayer) { " (layer; llama-server on 127.0.0.1:$ServerPort)" })$(if ($KeyFile) { ", API key on" })"
+    if ($Slots -gt 1 -and ($Fixed + $Growth + $Margin + 600) -gt $Ceiling) {
+        Write-Host "WARN   $Slots slots with this drafting need about $Fixed MiB of VRAM before any K/V cell; the limit on this card is $Ceiling MiB. The load can fail with `"out of memory`". Use fewer slots, or KINTSUGI_DRAFT=mtp (fewer state copies) or KINTSUGI_DRAFT=off."
+    }
     Write-Host "kv     $Kv, tiered: cells 0..$Cells in VRAM, $Cells..$Ctx in system RAM (free $($TotalMiB - $UsedMiB) MiB, reserved $ReservedMiB, ceiling $Ceiling, fixed $Fixed, growth $Growth, margin $Margin ($MarginWhy))"
     Write-Host "template $(if ($Template -eq 'model') { 'the model file''s own' } else { $Template })"
     if ($Head2 -gt 0) { Write-Host "head   two-stage: first stage q4_0 in VRAM, $Head2 exact candidates for each row from system RAM" }
     Write-Host "spec   $(if ($Mode -eq 'off') { 'off' } elseif ($Mode -eq 'dflash') { "DFlash2 draft 7 ($(Split-Path $Drafter -Leaf))" } else { "MTP draft $Draft + lookup" }); thinking $Think; effort $Effort; read $($env:GGML_ESCHA_PREFILL)"
     if ($DraftNote) { Write-Host $DraftNote }
+    if ($RsNote) { Write-Host $RsNote }
     Write-Host "vision $(if ($Vision -eq 'off') { 'off' } else { "$Vision ($(Split-Path $Mmproj -Leaf)), up to $ImgMax tokens per image" })"
     if ($DryRun) { Write-Host ("args   " + ($SrvArgs -join ' ')); exit 0 }
 
